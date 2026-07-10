@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "automation_suite": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--project",
+        "tools/skills/mcp/AutomationSuiteMCP",
+        "python",
+        "tools/skills/mcp/AutomationSuiteMCP/automation_suite_mcp.py"
+      ],
+      "env": {}
+    }
+  }
+}

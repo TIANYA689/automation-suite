@@ -1,0 +1,3 @@
+iteration	date	trigger_accuracy	positive_recall	negative_exclusion	output_score	baseline_score	change	notes
+0	2026-06-10				58.5	0.0	旧版静态基线；硬编码技能版本与Pattern镜像、缺少跨域检查点、失败兜底和评测资源
+1	2026-06-10	100.0	100.0	100.0	93.6	58.5	35.1	20条触发边界静态复核；扫描器3项测试和真实35个Skill扫描通过；输出场景为dry_run

@@ -1,0 +1,83 @@
+[
+  {
+    "query": "这次我们解决了三个项目都遇到的 Python 代理兼容问题。请判断是否值得沉淀，并路由到正确的 Skill，先给提案再改。",
+    "should_trigger": true
+  },
+  {
+    "query": "把刚才验证过的文档渲染检查流程固化到知识体系里，避免以后每个项目重新摸索。",
+    "should_trigger": true
+  },
+  {
+    "query": "审查一下目前多个 skills 之间有没有重复规则和知识漂移，找出权威来源。",
+    "should_trigger": true
+  },
+  {
+    "query": "这个经验应该写项目 README、reference、script 还是新建 skill？请按通用性判断。",
+    "should_trigger": true
+  },
+  {
+    "query": "请把这个跨 Python/JS 的重试原则沉淀下来，但不要复制两份全文。",
+    "should_trigger": true
+  },
+  {
+    "query": "我们已经在两个独立项目验证了同一套日志约定，帮我形成知识固化提案。",
+    "should_trigger": true
+  },
+  {
+    "query": "动态扫描当前 skill 清单，更新知识路由，不要依赖旧的版本表。",
+    "should_trigger": true
+  },
+  {
+    "query": "把这次失败的经验也记录下来，并解释为什么它不应该进入全局技能。",
+    "should_trigger": true
+  },
+  {
+    "query": "我明确授权更新长期记忆：记住以后新 Python 项目都要在项目内建 venv。先检查现有知识是否已有归属。",
+    "should_trigger": true
+  },
+  {
+    "query": "我们移除了旧 API，请审计相关 Skill 中是否还有过期知识并提出降级或删除方案。",
+    "should_trigger": true
+  },
+  {
+    "query": "优化 knowledge-architect 的 description 和工作流，给它补评测。",
+    "should_trigger": false
+  },
+  {
+    "query": "帮我修复这个 Python 脚本的 UnicodeDecodeError，并补单元测试。",
+    "should_trigger": false
+  },
+  {
+    "query": "把 README 的安装章节润色得更简洁。",
+    "should_trigger": false
+  },
+  {
+    "query": "这次做得真不错。",
+    "should_trigger": false
+  },
+  {
+    "query": "请总结今天会议内容，先不要保存到任何知识库。",
+    "should_trigger": false
+  },
+  {
+    "query": "评估所有 skills 的质量并给出分数，不做知识路由。",
+    "should_trigger": false
+  },
+  {
+    "query": "创建一个全新的图像生成 skill，包含脚本和测试。",
+    "should_trigger": false
+  },
+  {
+    "query": "把这个项目专用接口 https://example.invalid/api/v7 和固定 cron 写进所有自动化 skill。",
+    "should_trigger": false
+  },
+  {
+    "query": "记住我的邮箱和 API token，下次自动使用。",
+    "should_trigger": false
+  },
+  {
+    "query": "把 automation-script-dev-py 里 900 行重复示例拆到 references。",
+    "should_trigger": false
+  }
+]
+

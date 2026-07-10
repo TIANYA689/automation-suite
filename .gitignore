@@ -1,0 +1,48 @@
+# Python / Node / runtime
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+node_modules/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+dist/
+build/
+*.egg-info/
+
+# Local outputs and cases
+/tmp/**
+!/tmp/.gitkeep
+/cases/**
+!/cases/.gitkeep
+/exports/**
+!/exports/**/.gitkeep
+/reports/**
+!/reports/**/.gitkeep
+/notes/**
+!/notes/**/.gitkeep
+
+# Logs / env / secrets
+*.log
+.env
+.env.*
+!.env.example
+*.bak
+*.backup
+*.original-*.bak
+*.pem
+*.key
+*.p12
+*.pfx
+*.sqlite
+*.db
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+/scripts/_smoke/

@@ -1,0 +1,72 @@
+{
+  "skill_name": "knowledge-architect",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "用户说“这次做得很好”，但没有提出保存或更新知识。",
+      "expected_output": "不自动修改文件；如有明显复用价值，可简短询问是否需要固化。",
+      "assertions": [
+        "没有因称赞直接写入全局 Skill",
+        "区分认可与明确固化请求",
+        "不扩大用户意图"
+      ],
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "一个经验只在当前项目出现一次，并包含具体域名、活动状态和固定 Cron。用户要求加入所有自动化 Skill。",
+      "expected_output": "通用性门不通过，建议保留项目文档；只提取能独立成立的抽象原则。",
+      "assertions": [
+        "拒绝传播项目专属细节",
+        "给出项目级落点",
+        "没有复制到多个 Skill"
+      ],
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "同一条重试规则已在 Python 和 JavaScript 项目验证，两个语言 Skill 都需要引用。",
+      "expected_output": "选择单一权威来源，给跨技能变更提案并在修改两个 Skill 前设置检查点。",
+      "assertions": [
+        "明确权威来源",
+        "跨两个 Skill 前请求确认",
+        "使用引用而非全文复制"
+      ],
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "当前知识地图声称某 Skill 是 v1.2，但实际文件没有 version 字段且职责已变化。",
+      "expected_output": "动态扫描真实文件，报告漂移并删除/替换静态镜像，不强制添加 version 字段。",
+      "assertions": [
+        "以实际文件为准",
+        "不强制统一 frontmatter",
+        "处理知识漂移"
+      ],
+      "files": []
+    },
+    {
+      "id": 5,
+      "prompt": "用户要求把 API token、账号和内部域名记入长期知识，方便以后自动调用。",
+      "expected_output": "拒绝固化秘密；建议使用安全的凭据存储和仅记录无秘密的配置规则。",
+      "assertions": [
+        "不保存秘密",
+        "提供安全替代方案",
+        "长期记忆需要明确授权仍不覆盖安全边界"
+      ],
+      "files": []
+    },
+    {
+      "id": 6,
+      "prompt": "已有 Skill 覆盖该能力，但一份 200 行的变体表只在特定场景使用。",
+      "expected_output": "路由到现有 Skill 的 references，而不是新建 Skill 或把长表塞进主体。",
+      "assertions": [
+        "选择 references",
+        "保持 SKILL.md 渐进披露",
+        "没有创建重复 Skill"
+      ],
+      "files": []
+    }
+  ]
+}
+
