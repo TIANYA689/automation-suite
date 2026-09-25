@@ -129,7 +129,7 @@ HAR 中确认了免费网页模式：
 - `GET /content/{content_id}`
 - `GET /view/{view_id}`
 
-新 HAR 的请求摘要保存在 `data/new_har_requests.json` 中。新页面当前默认邮箱为 `googlemail.com`，所以模块默认也使用谷歌邮箱。
+新 HAR 的请求摘要写在 `data/` 目录下（该目录是本地派生产物，不进版本库）。新页面当前默认邮箱为 `googlemail.com`，所以模块默认也使用谷歌邮箱。
 
 ## 接码流程说明
 
