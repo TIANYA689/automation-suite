@@ -46,7 +46,7 @@ python scripts/misc/check_routing_drift.py     # 路由表漂移检查
 python scripts/misc/check_commands.py          # 文档命令真实性
 python scripts/misc/check_doc_refs.py          # 交叉引用可达性
 python scripts/misc/check_index.py             # 索引完备性
-python scripts/misc/check_budget.py            # 文档预算度量
+python scripts/misc/check_budget.py            # 文档与单文件体量预算
 python scripts/misc/check_tool_inventory.py    # MCP 工具清单一致性
 python scripts/misc/ai_finding.py validate     # 可复用发现库校验
 ```
@@ -59,7 +59,7 @@ python scripts/misc/ai_finding.py validate     # 可复用发现库校验
 | `check_commands.py` | 文档里的命令、子命令、选项是否真实存在 | 参数取值是否合理 |
 | `check_doc_refs.py` | 链接、锚点、被点名的路径是否可达 | 目标内容是否还相关 |
 | `check_index.py` | 每个技能/知识篇目/脚本是否都被索引点名 | 索引条目本身是否写得好 |
-| `check_budget.py` | 始终加载的部分有没有单向膨胀 | 内容是否有用 |
+| `check_budget.py` | 始终加载的部分与单个手写文件有没有单向膨胀 | 内容是否有用；只增/派生文件（`*.jsonl`/`*.json`/`*.csv`）与已有专属预算的文件不参与体积度量 |
 | `check_tool_inventory.py` | 文档复述的 MCP 工具名与数量是否与实现一致 | 工具本身设计得对不对 |
 
 六者互补且都**只做判定不做修改**：它们不自动改文档，只报出 file:line。

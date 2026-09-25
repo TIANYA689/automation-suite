@@ -54,7 +54,7 @@
 | `scripts/misc/check_commands.py` + `scripts/misc/tests/test_check_commands.py` | 文档命令真实性：静态解析命令行表面（含子命令与选项的扫描式判定），与文档里写的命令逐条对照，豁免项全量打印并计命中 | apk-reverse |
 | `scripts/misc/check_doc_refs.py` + `scripts/misc/tests/test_check_doc_refs.py` | 交叉引用可达性：链接目标、`#锚点`（按 Unicode 类别丢标点的 slug 规则）、反引号点名的路径 | apk-reverse |
 | `scripts/misc/check_index.py` + `scripts/misc/tests/test_check_index.py` | 索引完备性：每个知识篇目必须被索引点名、索引不许指向空气、技能与脚本不得漏登 | apk-reverse |
-| `scripts/misc/check_budget.py` + `scripts/misc/tests/test_check_budget.py` | 体量预算度量（阈值用本仓库实测标定）、可导航性提示、含糊词趋势 | apk-reverse |
+| `scripts/misc/check_budget.py` + `scripts/misc/tests/test_check_budget.py` | 体量预算度量（阈值用本仓库实测标定）、单文件体积预算（只增/派生文件与已有专属预算的文件不重复计入）、可导航性提示、含糊词趋势 | apk-reverse |
 | `kb/methodology/techniques/02-long-task-discipline.md` | 活记录六段结构、四档结论分级、`RESULT=<token>` 与退出码固定语义、单变量纪律、六个约束轴与"交付物永远不会见到的环境"、给等待设上界、观察窗口洁净、长上下文衰减、交接清单 | apk-reverse |
 | `kb/methodology/techniques/03-verification-ladder.md` | 主张阶梯 0–7 与各档适用条件、零改动对照规则、结构/运行/行为三段验证、相邻功能回归清单、报告模板与反模式 | apk-reverse |
 | `kb/methodology/techniques/04-coverage-and-limits.md` | 三档强度标签的严格口径、覆盖分栏（已验证机制 vs 有文档但推断）、不分发的依赖、**不覆盖清单**、历史验证记录、能力闭包与"未探测≠不具备" | apk-reverse |
