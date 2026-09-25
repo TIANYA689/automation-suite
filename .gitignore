@@ -24,11 +24,20 @@ build/
 /notes/**
 !/notes/**/.gitkeep
 
+# 抓包作业区：只提交索引与模板；作业内容含真实抓包与可用脚本，留本地
+# 这里必须用 /projects/* 而不是 /projects/**：后者会把 _template 目录本身也排除掉，
+# 而 git 不允许在父目录被排除之后重新包含其内容，negation 就失效了。
+/projects/*
+!/projects/README.md
+!/projects/_template/
+
 # Logs / env / secrets
+# 项目不读取 .env（无 load_dotenv / 无 .env 解析）；唯一的真实环境变量
+# AUTOMATION_SUITE_ROOT 由三端用户级 MCP 配置注入，不走仓库内文件。
+# 因此不再声明 .env.example——那条 negation 曾指向一个从不存在的文件。
 *.log
 .env
 .env.*
-!.env.example
 *.bak
 *.backup
 *.original-*.bak
@@ -39,10 +48,33 @@ build/
 *.sqlite
 *.db
 
+# 抓包与「从抓包派生的证据」：含真实请求/响应数据（第三方邮箱、Cookie、令牌）。
+# 实测证据：模块目录内曾散落 2 份真实 .har（含真实 gmail 与 9 处邮箱）、
+# 一份 data/har_summary.json（observed_email）、一份 data/inbox_page.html（邮箱 + 真实 token）。
+# projects/ 下的抓包已由 /projects/* 覆盖，这里兜底模块目录内的同类文件。
+*.har
+tools/automation-modules/**/data/
+
+# 路由索引为派生产物，由 routing.source.json + 磁盘扫描生成
+/routing.index.json
+
+# 发现库的写入锁，进程间互斥用，不提交
+/kb/ai-findings/*.lock
+
 # OS/editor
 .DS_Store
 Thumbs.db
 .vscode/
 .idea/
+
+# 代理 / 编辑器本地文件：不进仓库。逐条理由（都是实测，不是防御性猜测）：
+#   CLAUDE.md        试图改写助手行为边界，与项目 DISCLAIMER 冲突
+#   .trae/           内含个人联系信息与云账号表，且其流程约定与本项目不一致
+#   .claude/skills/  loop-sec 的「不问、不留 TODO」与本项目授权边界纪律冲突
+#   .workbuddy-ai/   代理本地记忆，check_tool_inventory 已声明不进仓库
+/CLAUDE.md
+/.trae/
+/.claude/skills/
+/.workbuddy-ai/
 
 /scripts/_smoke/
