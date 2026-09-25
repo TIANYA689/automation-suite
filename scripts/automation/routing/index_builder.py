@@ -268,7 +268,7 @@ def write_index(root: Path | None = None, output: Path | None = None) -> Path:
     root = root or find_root()
     index = build_index(root)
     target = output or (root / INDEX_FILE)
-    target.write_text(json.dumps(index, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    target.write_text(json.dumps(index, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
     return target
 
 

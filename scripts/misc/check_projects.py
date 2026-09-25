@@ -24,6 +24,12 @@
   `EXHAUSTED` 要有写明原因的 `dead_ends`
 - 索引块与作业集合不一致
 
+关于索引块这条，有一个刻意的例外（见 `run()`）：**作业目录一个都没有时不比对**。
+`/projects/*` 全在 `.gitignore` 里，所以新克隆里只有 `README.md` 与 `_template/`，
+而索引块是已提交的——它描述的作业在克隆里根本不存在。此时没有输入可比对，
+如实报 `index_check: skipped:no-jobs`，不报 DRIFT。否则 CI 会永远红，
+而红的理由与被检查的代码无关。
+
 零第三方依赖。
 
 用法：
@@ -267,14 +273,15 @@ def rebuild_index() -> str:
         f"{BEGIN_MARK}\n{current}\n{END_MARK}",
         f"{BEGIN_MARK}\n{table}\n{END_MARK}",
     )
-    INDEX_DOC.write_text(updated, encoding="utf-8")
+    INDEX_DOC.write_text(updated, encoding="utf-8", newline="\n")
     return table
 
 
 def run() -> dict[str, object]:
     errors: list[str] = []
 
-    job_paths = [directory / "job.json" for directory in job_dirs()]
+    directories = job_dirs()
+    job_paths = [directory / "job.json" for directory in directories]
     template_job = PROJECTS_ROOT / TEMPLATE_DIR_NAME / "job.json"
     if template_job.is_file():
         job_paths.append(template_job)
@@ -282,22 +289,41 @@ def run() -> dict[str, object]:
     for path in job_paths:
         errors.extend(validate_job(path))
 
+    index_check = "absent"
     if INDEX_DOC.is_file():
         block, block_errors = read_index_block(INDEX_DOC.read_text(encoding="utf-8"))
         errors.extend(block_errors)
-        if block is not None and block != render_index():
+        if block is None:
+            index_check = "unreadable"
+        elif not directories:
+            # 作业目录一个都没有 = 新克隆：`/projects/*` 全在 .gitignore 里，
+            # 克隆里只剩 README.md 与 _template/。
+            #
+            # 索引块是「已提交、却派生自未提交输入」的产物——没有输入就没有
+            # 「一致」可言。所以如实报「跳过」，**不能**报 DRIFT：后者会让 CI
+            # 永远红，而红的理由与被检查的代码毫无关系（实测：`git archive HEAD`
+            # 出来的克隆里，这一步必然失败，本地却全绿）。
+            #
+            # 这不削弱任何保证：作业目录存在时照常比对；真有人误把作业目录
+            # 提交上去，CI 里 directories 就不为空，比对立即生效。
+            index_check = "skipped:no-jobs"
+        elif block != render_index():
+            index_check = "compared:drift"
             errors.append(
                 f"{INDEX_DOC.relative_to(ROOT).as_posix()}: 索引表与各作业的 job.json 不一致"
                 "——跑 --rebuild-index 重建，不要手改表"
             )
+        else:
+            index_check = "compared:ok"
     else:
         errors.append("projects/README.md 不存在")
 
     return {
         "ok": not errors,
-        "job_count": len(job_dirs()),
+        "job_count": len(directories),
         "checked_files": [path.relative_to(ROOT).as_posix() for path in job_paths],
         "valid_statuses": sorted(VALID_STATUSES),
+        "index_check": index_check,
         "errors": errors,
     }
 
@@ -320,6 +346,9 @@ def main(argv: list[str] | None = None) -> int:
     report = run()
     print(json.dumps(report, ensure_ascii=False, indent=2))
     if not args.json:
+        if str(report.get("index_check", "")).startswith("skipped"):
+            print("NOTE: 作业目录为空（新克隆的常态），索引块没有输入可比对——已跳过。")
+            print("      索引一致性只在有作业目录的本地校验，CI 上这一步不构成门禁。")
         print(f"RESULT={'OK' if report['ok'] else 'DRIFT'}")
     return 0 if report["ok"] else 1
 

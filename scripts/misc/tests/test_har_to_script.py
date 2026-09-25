@@ -835,7 +835,7 @@ class TestExpect(unittest.TestCase):
 class TestCli(unittest.TestCase):
     def _har_file(self, directory: str) -> Path:
         path = Path(directory) / "capture.har"
-        path.write_text(json.dumps(synthetic_har()), encoding="utf-8")
+        path.write_text(json.dumps(synthetic_har()), encoding="utf-8", newline="\n")
         return path
 
     def test_emit_plan_writes_a_template(self) -> None:
@@ -855,7 +855,7 @@ class TestCli(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             har = self._har_file(directory)
             plan_path = Path(directory) / "plan.json"
-            plan_path.write_text(json.dumps(valid_plan()), encoding="utf-8")
+            plan_path.write_text(json.dumps(valid_plan()), encoding="utf-8", newline="\n")
             stdout = io.StringIO()
             with contextlib.redirect_stdout(stdout):
                 code = main(["--har", str(har), "--plan", str(plan_path), "--check"])
@@ -868,7 +868,7 @@ class TestCli(unittest.TestCase):
             plan = valid_plan()
             plan["steps"][0]["role"] = ""
             plan_path = Path(directory) / "plan.json"
-            plan_path.write_text(json.dumps(plan), encoding="utf-8")
+            plan_path.write_text(json.dumps(plan), encoding="utf-8", newline="\n")
             stdout = io.StringIO()
             with contextlib.redirect_stdout(stdout):
                 code = main(["--har", str(har), "--plan", str(plan_path), "--check"])
@@ -879,7 +879,7 @@ class TestCli(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             har = self._har_file(directory)
             plan_path = Path(directory) / "plan.json"
-            plan_path.write_text(json.dumps(valid_plan()), encoding="utf-8")
+            plan_path.write_text(json.dumps(valid_plan()), encoding="utf-8", newline="\n")
             target = Path(directory) / "signin.py"
             stdout = io.StringIO()
             with contextlib.redirect_stdout(stdout):
@@ -908,7 +908,7 @@ class TestCli(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             har = self._har_file(directory)
             plan_path = Path(directory) / "plan.json"
-            plan_path.write_text("{broken", encoding="utf-8")
+            plan_path.write_text("{broken", encoding="utf-8", newline="\n")
             stderr = io.StringIO()
             with contextlib.redirect_stderr(stderr):
                 code = main(["--har", str(har), "--plan", str(plan_path)])

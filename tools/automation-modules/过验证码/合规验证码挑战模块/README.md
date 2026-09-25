@@ -142,7 +142,7 @@ apply_to_environ(proofs)
 3. **值只交付一次，且不进审计。** `collect()` 返回一次，`summarize()` 只报长度，
    `export_lines()` 是唯一带值的地方——终端是交付通道，审计文件不是。
 
-作业侧的完整接入例子见 `projects/20260925-avalon-register-login/` 下的
+作业侧的完整接入例子见 `projects/20260925-avalon/` 下的
 `fetch_manual_inputs.py`（作业目录不进版本库，故只点名目录）。
 
 ## 扩展官方提供方

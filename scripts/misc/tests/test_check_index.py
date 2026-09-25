@@ -62,7 +62,7 @@ class CompletenessTests(unittest.TestCase):
         )
         payload = {"version": "1.0", "entries": entries}
         (self.root / "kb" / "demo" / "techniques" / "kb-index.json").write_text(
-            json.dumps(payload, ensure_ascii=False), encoding="utf-8"
+            json.dumps(payload, ensure_ascii=False), encoding="utf-8", newline="\n"
         )
 
     def _write_skill(self, name: str, references: dict[str, str] | None = None) -> None:
@@ -72,21 +72,21 @@ class CompletenessTests(unittest.TestCase):
         if references:
             (directory / "references").mkdir(exist_ok=True)
             for filename, content in references.items():
-                (directory / "references" / filename).write_text(content, encoding="utf-8")
+                (directory / "references" / filename).write_text(content, encoding="utf-8", newline="\n")
                 body += f"\n见 `{filename}`。\n"
-        (directory / "SKILL.md").write_text(body, encoding="utf-8")
+        (directory / "SKILL.md").write_text(body, encoding="utf-8", newline="\n")
 
     def _write_routing(self, skills: list[str]) -> None:
         (self.root / "routing.source.json").write_text(
             json.dumps({"skills": {name: {"signals": []} for name in skills}}, ensure_ascii=False),
-            encoding="utf-8",
+            encoding="utf-8", newline="\n",
         )
 
     def _kinds(self, report: dict) -> list[str]:
         return [drift["kind"] for drift in report["drifts"]]
 
     def test_clean_tree_passes(self) -> None:
-        (self.root / "kb" / "demo" / "techniques" / "01-real.md").write_text("# x\n", encoding="utf-8")
+        (self.root / "kb" / "demo" / "techniques" / "01-real.md").write_text("# x\n", encoding="utf-8", newline="\n")
         self._write_index(["01-real.md"])
         self._write_skill("alpha", {"note.md": "# 笔记\n"})
         self._write_routing(["alpha"])
@@ -94,8 +94,8 @@ class CompletenessTests(unittest.TestCase):
 
     def test_unindexed_kb_file_is_detected(self) -> None:
         """这是漂移检查看不见的那一类：从未入索引的篇目等于不存在。"""
-        (self.root / "kb" / "demo" / "techniques" / "01-real.md").write_text("# x\n", encoding="utf-8")
-        (self.root / "kb" / "demo" / "techniques" / "02-orphan.md").write_text("# y\n", encoding="utf-8")
+        (self.root / "kb" / "demo" / "techniques" / "01-real.md").write_text("# x\n", encoding="utf-8", newline="\n")
+        (self.root / "kb" / "demo" / "techniques" / "02-orphan.md").write_text("# y\n", encoding="utf-8", newline="\n")
         self._write_index(["01-real.md"])
         self._write_routing([])
         report = run()
@@ -108,13 +108,13 @@ class CompletenessTests(unittest.TestCase):
         self._write_routing([])
         orphan = self.root / "kb" / "ghost" / "techniques"
         orphan.mkdir(parents=True)
-        (orphan / "01-lost.md").write_text("# 没人找得到我\n", encoding="utf-8")
+        (orphan / "01-lost.md").write_text("# 没人找得到我\n", encoding="utf-8", newline="\n")
         report = run()
         self.assertIn("kb_index_missing", self._kinds(report))
         self.assertIn("01-lost.md", json.dumps(report["drifts"], ensure_ascii=False))
 
     def test_domain_with_index_is_not_flagged(self) -> None:
-        (self.root / "kb" / "demo" / "techniques" / "01-real.md").write_text("# x\n", encoding="utf-8")
+        (self.root / "kb" / "demo" / "techniques" / "01-real.md").write_text("# x\n", encoding="utf-8", newline="\n")
         self._write_index(["01-real.md"])
         self._write_routing([])
         self.assertNotIn("kb_index_missing", self._kinds(run()))
@@ -125,7 +125,7 @@ class CompletenessTests(unittest.TestCase):
         self.assertIn("kb_missing_file", self._kinds(run()))
 
     def test_empty_entry_is_detected(self) -> None:
-        (self.root / "kb" / "demo" / "techniques" / "01-real.md").write_text("# x\n", encoding="utf-8")
+        (self.root / "kb" / "demo" / "techniques" / "01-real.md").write_text("# x\n", encoding="utf-8", newline="\n")
         self._write_index(["01-real.md"], signals=[])
         self._write_routing([])
         self.assertIn("kb_empty_entry", self._kinds(run()))
@@ -145,15 +145,15 @@ class CompletenessTests(unittest.TestCase):
         self._write_index([])
         directory = self.root / "skills" / "alpha"
         (directory / "references").mkdir(parents=True)
-        (directory / "SKILL.md").write_text("# alpha\n", encoding="utf-8")
-        (directory / "references" / "unused.md").write_text("# 没人读我\n", encoding="utf-8")
+        (directory / "SKILL.md").write_text("# alpha\n", encoding="utf-8", newline="\n")
+        (directory / "references" / "unused.md").write_text("# 没人读我\n", encoding="utf-8", newline="\n")
         self._write_routing(["alpha"])
         self.assertIn("reference_orphan", self._kinds(run()))
 
     def test_orphan_script_is_detected(self) -> None:
         self._write_index([])
         self._write_routing([])
-        (self.root / "scripts" / "lonely.py").write_text("x = 1\n", encoding="utf-8")
+        (self.root / "scripts" / "lonely.py").write_text("x = 1\n", encoding="utf-8", newline="\n")
         report = run()
         self.assertIn("script_orphan", self._kinds(report))
 
@@ -162,10 +162,10 @@ class CompletenessTests(unittest.TestCase):
         self._write_routing([])
         internal = self.root / "scripts" / "automation" / "routing"
         internal.mkdir(parents=True)
-        (internal / "engine.py").write_text("x = 1\n", encoding="utf-8")
+        (internal / "engine.py").write_text("x = 1\n", encoding="utf-8", newline="\n")
         tests = self.root / "scripts" / "misc" / "tests"
         tests.mkdir(parents=True)
-        (tests / "test_x.py").write_text("x = 1\n", encoding="utf-8")
+        (tests / "test_x.py").write_text("x = 1\n", encoding="utf-8", newline="\n")
         self.assertTrue(run()["ok"], run()["drifts"])
 
     def test_backup_directory_is_not_a_skill(self) -> None:

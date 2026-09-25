@@ -131,7 +131,7 @@ class FindingsLockTests(unittest.TestCase):
     def test_stale_lock_is_reclaimed(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             lock_path = Path(raw) / "findings.jsonl.lock"
-            lock_path.write_text("", encoding="utf-8")
+            lock_path.write_text("", encoding="utf-8", newline="\n")
             stale = time.time() - (LOCK_STALE_SECONDS + 10)
             os.utime(lock_path, (stale, stale))
             with FindingsLock(lock_path, timeout=1.0):

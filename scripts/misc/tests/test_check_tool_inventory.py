@@ -65,7 +65,7 @@ class InventoryTests(unittest.TestCase):
         self._originals = (check_tool_inventory.ROOT, check_tool_inventory.MCP_SERVER)
         check_tool_inventory.ROOT = self.root
         check_tool_inventory.MCP_SERVER = self.root / "mcp_server.py"
-        check_tool_inventory.MCP_SERVER.write_text(MCP_SOURCE, encoding="utf-8")
+        check_tool_inventory.MCP_SERVER.write_text(MCP_SOURCE, encoding="utf-8", newline="\n")
         (self.root / "docs").mkdir()
 
     def tearDown(self) -> None:
@@ -75,7 +75,7 @@ class InventoryTests(unittest.TestCase):
     def _doc(self, body: str, name: str = "AI-USAGE.md") -> None:
         target = self.root / name
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(body, encoding="utf-8")
+        target.write_text(body, encoding="utf-8", newline="\n")
 
     def _kinds(self, report: dict) -> list[str]:
         return [drift["kind"] for drift in report["drifts"]]
@@ -151,7 +151,7 @@ class InventoryTests(unittest.TestCase):
     def test_unknown_annotation_is_detected(self) -> None:
         check_tool_inventory.MCP_SERVER.write_text(
             MCP_SOURCE + "\n\n@_tool()\ndef mystery() -> None:\n    return None\n",
-            encoding="utf-8",
+            encoding="utf-8", newline="\n",
         )
         self._doc(CLEAN_DOC)
         self.assertIn("unknown_annotation", self._kinds(run()))

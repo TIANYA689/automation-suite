@@ -89,7 +89,7 @@ def main() -> int:
     if args.output:
         output = args.output if args.output.is_absolute() else root / args.output
         output.parent.mkdir(parents=True, exist_ok=True)
-        output.write_text(rendered, encoding="utf-8")
+        output.write_text(rendered, encoding="utf-8", newline="\n")
     print(rendered, end="")
     return 0 if report["ok"] else 1
 

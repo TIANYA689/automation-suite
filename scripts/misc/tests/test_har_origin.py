@@ -587,7 +587,7 @@ class TestCli(unittest.TestCase):
     def setUp(self) -> None:
         self.tmp = Path(tempfile.mkdtemp(prefix="origin-test-"))
         self.har_path = self.tmp / "capture.har"
-        self.har_path.write_text(json.dumps(synthetic_har()), encoding="utf-8")
+        self.har_path.write_text(json.dumps(synthetic_har()), encoding="utf-8", newline="\n")
 
     def tearDown(self) -> None:
         for path in sorted(self.tmp.rglob("*"), reverse=True):
@@ -646,7 +646,7 @@ class TestCli(unittest.TestCase):
 
     def test_non_har_json_is_reported(self) -> None:
         bad = self.tmp / "bad.har"
-        bad.write_text('{"not": "a har"}', encoding="utf-8")
+        bad.write_text('{"not": "a har"}', encoding="utf-8", newline="\n")
         buffer = io.StringIO()
         with contextlib.redirect_stderr(buffer):
             code = main([str(bad)])

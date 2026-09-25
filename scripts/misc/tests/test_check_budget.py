@@ -65,7 +65,7 @@ class BudgetReportTests(unittest.TestCase):
         check_budget.ROUTING_SOURCE = self.root / "routing.source.json"
         (self.root / "skills").mkdir()
         (self.root / "routing.source.json").write_text(
-            json.dumps({"skills": {}}), encoding="utf-8"
+            json.dumps({"skills": {}}), encoding="utf-8", newline="\n"
         )
 
     def tearDown(self) -> None:
@@ -80,7 +80,7 @@ class BudgetReportTests(unittest.TestCase):
         directory = self.root / "skills" / name
         directory.mkdir(parents=True, exist_ok=True)
         body = "\n".join(f"行 {index}" for index in range(lines))
-        (directory / "SKILL.md").write_text(body, encoding="utf-8")
+        (directory / "SKILL.md").write_text(body, encoding="utf-8", newline="\n")
 
     def test_small_skill_is_within_budget(self) -> None:
         self._skill("alpha", 50)
@@ -124,7 +124,7 @@ class BudgetReportTests(unittest.TestCase):
     def test_hedging_is_reported_as_a_trend_not_a_failure(self) -> None:
         self._skill("alpha", 5)
         (self.root / "skills" / "alpha" / "SKILL.md").write_text(
-            "这里可能有问题，视情况处理。", encoding="utf-8"
+            "这里可能有问题，视情况处理。", encoding="utf-8", newline="\n"
         )
         report = run()
         self.assertTrue(report["ok"], "含糊词只作趋势报告，不判失败")

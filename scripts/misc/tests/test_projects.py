@@ -85,7 +85,7 @@ def seed_template(target: Path) -> None:
     """把真实模板逐文件写进沙箱。逐文件写，不做递归复制。"""
     target.mkdir(parents=True, exist_ok=True)
     for source in sorted(REAL_TEMPLATE.iterdir()):
-        (target / source.name).write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
+        (target / source.name).write_text(source.read_text(encoding="utf-8"), encoding="utf-8", newline="\n")
 
 
 def valid_job(project: str = "20260925-example") -> dict:
@@ -139,7 +139,7 @@ class SandboxCleanupTests(unittest.TestCase):
     def test_normal_delete_still_removes_the_tree(self) -> None:
         target = Path(tempfile.mkdtemp())
         (target / "run0").mkdir()
-        (target / "run0" / "job.json").write_text("{}", encoding="utf-8")
+        (target / "run0" / "job.json").write_text("{}", encoding="utf-8", newline="\n")
         _cleanup(target)
         self.assertFalse(target.exists())
 
@@ -185,7 +185,7 @@ class PatchableTestCase(unittest.TestCase):
         self.fake_root.mkdir(parents=True)
         seed_template(self.fake_root / "_template")
         self.index_doc = self.fake_root / "README.md"
-        self.index_doc.write_text(INDEX_DOC_TEMPLATE, encoding="utf-8")
+        self.index_doc.write_text(INDEX_DOC_TEMPLATE, encoding="utf-8", newline="\n")
 
         self.saved = (
             check_projects.PROJECTS_ROOT,
@@ -210,7 +210,7 @@ class PatchableTestCase(unittest.TestCase):
         target = self.fake_root / directory
         target.mkdir(parents=True, exist_ok=True)
         path = target / "job.json"
-        path.write_text(json.dumps(job, ensure_ascii=False), encoding="utf-8")
+        path.write_text(json.dumps(job, ensure_ascii=False), encoding="utf-8", newline="\n")
         return path
 
     def error_kinds(self, job: dict, directory: str = "20260925-example") -> list[str]:
@@ -329,7 +329,7 @@ class JobSchemaTests(PatchableTestCase):
         target = self.fake_root / "20260925-broken"
         target.mkdir()
         path = target / "job.json"
-        path.write_text("{not json", encoding="utf-8")
+        path.write_text("{not json", encoding="utf-8", newline="\n")
         self.assertTrue(any("invalid JSON" in e for e in check_projects.validate_job(path)))
 
 

@@ -109,7 +109,7 @@ def fill_markdown(path: Path, project: str, slug: str) -> None:
         return
     updated = text.replace(PROJECT_PLACEHOLDER, project).replace(SLUG_PLACEHOLDER, slug)
     if updated != text:
-        path.write_text(updated, encoding="utf-8")
+        path.write_text(updated, encoding="utf-8", newline="\n")
 
 
 def create(slug: str, iso_date: str, goal: str | None, dry_run: bool) -> dict:
@@ -134,7 +134,7 @@ def create(slug: str, iso_date: str, goal: str | None, dry_run: bool) -> dict:
     shutil.copytree(TEMPLATE_DIR, target)
     job = build_job(slug, project, iso_date, goal)
     (target / "job.json").write_text(
-        json.dumps(job, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+        json.dumps(job, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n"
     )
     for path in target.rglob("*.md"):
         fill_markdown(path, project, slug)

@@ -117,7 +117,7 @@ class TestWriteJson(unittest.TestCase):
                         "keep": 1,
                     }
                 ),
-                encoding="utf-8",
+                encoding="utf-8", newline="\n",
             )
             inst.write_json(path, {"command": "py", "args": ["a.py"]})
             data = json.loads(path.read_text(encoding="utf-8"))
@@ -129,7 +129,7 @@ class TestWriteJson(unittest.TestCase):
     def test_invalid_json_aborts(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "mcp.json"
-            path.write_text("{ not json", encoding="utf-8")
+            path.write_text("{ not json", encoding="utf-8", newline="\n")
             with self.assertRaises(SystemExit):
                 inst.write_json(path, {"command": "py"})
 

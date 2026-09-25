@@ -29,7 +29,7 @@ class ResolveInterpreterTests(unittest.TestCase):
             working_directory = Path(raw)
             launcher = working_directory / "venv" / "Scripts" / "python.exe"
             launcher.parent.mkdir(parents=True)
-            launcher.write_text("", encoding="utf-8")
+            launcher.write_text("", encoding="utf-8", newline="\n")
             interpreter, source = resolve_interpreter(working_directory)
         self.assertEqual(source, "module-venv")
         self.assertTrue(interpreter.endswith("python.exe"))
@@ -39,7 +39,7 @@ class ResolveInterpreterTests(unittest.TestCase):
             working_directory = Path(raw)
             launcher = working_directory / ".venv" / "bin" / "python"
             launcher.parent.mkdir(parents=True)
-            launcher.write_text("", encoding="utf-8")
+            launcher.write_text("", encoding="utf-8", newline="\n")
             interpreter, source = resolve_interpreter(working_directory)
         self.assertEqual(source, "module-venv")
         self.assertTrue(interpreter.endswith("python"))
@@ -87,7 +87,7 @@ class RunSuiteTests(unittest.TestCase):
                 "class Sample(unittest.TestCase):\n"
                 "    def test_ok(self) -> None:\n"
                 "        self.assertTrue(True)\n",
-                encoding="utf-8",
+                encoding="utf-8", newline="\n",
             )
             result = run_suite("sample", working_directory, (), {})
         self.assertEqual(result["status"], "passed")
@@ -106,7 +106,7 @@ class RunSuiteTests(unittest.TestCase):
                 "        print('Ran 99 tests in 0.001s')\n"
                 "    def test_b(self) -> None:\n"
                 "        self.assertTrue(True)\n",
-                encoding="utf-8",
+                encoding="utf-8", newline="\n",
             )
             result = run_suite("sample", working_directory, (), {})
         self.assertEqual(result["status"], "passed")
@@ -122,7 +122,7 @@ class RunSuiteTests(unittest.TestCase):
                 "class Sample(unittest.TestCase):\n"
                 "    def test_nope(self) -> None:\n"
                 "        self.fail('boom')\n",
-                encoding="utf-8",
+                encoding="utf-8", newline="\n",
             )
             # 失败的套件会把子进程输出转发到 stderr；这里必须吞掉，
             # 否则 "Ran 1 test" 会混进外层运行器的输出，污染计数解析。

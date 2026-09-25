@@ -107,7 +107,7 @@ def write_json(path: Path, entry: dict) -> None:
         servers.pop(legacy, None)
     servers[SERVER_NAME] = entry
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
     json.loads(path.read_text(encoding="utf-8"))
 
 
@@ -166,7 +166,7 @@ def write_toml(path: Path, block: str) -> Path | None:
         shutil.copy2(path, backup)
 
     updated = upsert_toml(original, block)
-    path.write_text(updated, encoding="utf-8")
+    path.write_text(updated, encoding="utf-8", newline="\n")
     try:
         parsed = tomllib.loads(updated)
     except tomllib.TOMLDecodeError as exc:

@@ -42,7 +42,7 @@ class ReferenceDriftTests(unittest.TestCase):
         self.root = Path(self._temp.name)
         (self.root / "kb" / "demo" / "techniques").mkdir(parents=True)
         (self.root / "kb" / "demo" / "techniques" / "01-real.md").write_text(
-            "# 真篇目\n\n## 小节标题\n", encoding="utf-8"
+            "# 真篇目\n\n## 小节标题\n", encoding="utf-8", newline="\n"
         )
         self._original = check_doc_refs.ROOT
         check_doc_refs.ROOT = self.root
@@ -55,7 +55,7 @@ class ReferenceDriftTests(unittest.TestCase):
 
     def _run(self, markdown: str) -> dict:
         doc = self.root / "README.md"
-        doc.write_text(textwrap.dedent(markdown), encoding="utf-8")
+        doc.write_text(textwrap.dedent(markdown), encoding="utf-8", newline="\n")
         check_doc_refs._ANCHOR_CACHE.clear()
         return run()
 
@@ -95,9 +95,9 @@ class ReferenceDriftTests(unittest.TestCase):
     def test_skill_relative_path_resolves_against_doc_directory(self) -> None:
         skill = self.root / "skills" / "demo"
         (skill / "references").mkdir(parents=True)
-        (skill / "references" / "note.md").write_text("# 笔记\n", encoding="utf-8")
+        (skill / "references" / "note.md").write_text("# 笔记\n", encoding="utf-8", newline="\n")
         doc = skill / "SKILL.md"
-        doc.write_text("见 `references/note.md`。\n", encoding="utf-8")
+        doc.write_text("见 `references/note.md`。\n", encoding="utf-8", newline="\n")
         self.assertTrue(run()["ok"])
 
     def test_external_link_is_exempt(self) -> None:

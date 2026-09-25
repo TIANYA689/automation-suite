@@ -55,6 +55,5 @@ python scripts/misc/check_projects.py --rebuild-index   # 重建下面的表
 <!-- BEGIN: projects-index -->
 | 日期 | 项目 | 目标 | 抓包 | 状态 | 知识回流 |
 |---|---|---|---|---|---|
-| 2026-09-25 | `20260925-avalon-signin` | 从抓包生成阿瓦隆签到脚本：令牌长期有效、无签名参数，脚本不需要登录流程 | 2 份 / 160 条 / 34 端点 | CONTINUE | 3 项 |
-| 2026-09-25 | `20260925-avalon-register-login` | 从抓包生成阿瓦隆注册与登录脚本：注册需邮箱验证码与 reCAPTCHA 令牌，登录返回长期 Authorization，补全「注册 → 登录 → 签到」链 | 2 份 / 160 条 / 37 端点 | CONTINUE | 22 项 |
+| 2026-09-25 | `20260925-avalon` | 从四份真实抓包打通阿瓦隆的「取验证码 → 注册 → 登录 → 实名认证 → 签到」全链：能自动的做成脚本，卡在 reCAPTCHA 上的一跳说明为什么必须由浏览器里的人来做 | 4 份 / 320 条 / 71 端点 | CONTINUE | 19 项 |
 <!-- END: projects-index -->

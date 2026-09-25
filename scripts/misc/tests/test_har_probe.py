@@ -372,14 +372,14 @@ class TestLoadAndCli(unittest.TestCase):
     def test_rejects_non_har_payload(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "not-a-har.json"
-            path.write_text('{"foo": 1}', encoding="utf-8")
+            path.write_text('{"foo": 1}', encoding="utf-8", newline="\n")
             with self.assertRaises(ValueError):
                 load_har(str(path))
 
     def test_rejects_broken_json(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "broken.har"
-            path.write_text("{not json", encoding="utf-8")
+            path.write_text("{not json", encoding="utf-8", newline="\n")
             with self.assertRaises(json.JSONDecodeError):
                 load_har(str(path))
 
@@ -387,7 +387,7 @@ class TestLoadAndCli(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             har_path = Path(directory) / "capture.har"
             out_path = Path(directory) / "probe.json"
-            har_path.write_text(json.dumps(synthetic_har()), encoding="utf-8")
+            har_path.write_text(json.dumps(synthetic_har()), encoding="utf-8", newline="\n")
             stdout = io.StringIO()
             with contextlib.redirect_stdout(stdout):
                 code = main([str(har_path), "--json", "--out", str(out_path)])
@@ -407,7 +407,7 @@ class TestLoadAndCli(unittest.TestCase):
     def test_cli_timeline_renders_sequence(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             har_path = Path(directory) / "capture.har"
-            har_path.write_text(json.dumps(synthetic_har()), encoding="utf-8")
+            har_path.write_text(json.dumps(synthetic_har()), encoding="utf-8", newline="\n")
             stdout = io.StringIO()
             with contextlib.redirect_stdout(stdout):
                 code = main([str(har_path), "--timeline", "--top", "3"])
@@ -420,7 +420,7 @@ class TestLoadAndCli(unittest.TestCase):
         har["log"]["entries"] = list(reversed(har["log"]["entries"]))
         with tempfile.TemporaryDirectory() as directory:
             har_path = Path(directory) / "capture.har"
-            har_path.write_text(json.dumps(har), encoding="utf-8")
+            har_path.write_text(json.dumps(har), encoding="utf-8", newline="\n")
             stdout = io.StringIO()
             with contextlib.redirect_stdout(stdout):
                 main([str(har_path), "--timeline"])
@@ -429,7 +429,7 @@ class TestLoadAndCli(unittest.TestCase):
     def test_timeline_title_stays_quiet_when_order_was_fine(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             har_path = Path(directory) / "capture.har"
-            har_path.write_text(json.dumps(synthetic_har()), encoding="utf-8")
+            har_path.write_text(json.dumps(synthetic_har()), encoding="utf-8", newline="\n")
             stdout = io.StringIO()
             with contextlib.redirect_stdout(stdout):
                 main([str(har_path), "--timeline"])

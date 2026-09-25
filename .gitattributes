@@ -1,0 +1,16 @@
+# 统一行尾为 LF。
+#
+# 为什么这个文件必须有：本仓库有一批**按行解析**的校验器与数据结构——
+# `ai_finding.py validate` 明确要求 `kb/ai-findings/findings.jsonl` 只含 LF，
+# `check_*` 系列逐行取反引号路径与命令。CRLF 会让 diff 与逐行解析都变得不可预期。
+#
+# 而 Windows 上的 git 默认 `core.autocrlf=true`。**没有本文件时，一次全新 clone
+# 会把全部 240 个文本文件变成 CRLF**——实测：`git clone` 后
+# `git ls-files --eol` 得到 `w/lf=0  w/crlf=240`，`test_committed_findings_use_lf_endings`
+# 立刻失败。GitHub Actions 的 `windows-latest` 镜像同样是 `core.autocrlf=true`，
+# 所以这不是「本机设置问题」，是 CI 上必然发生的失败。
+#
+# 只钉文本文件：`text=auto` 会先做二进制识别，图片、`.har` 等不会被改。
+# 提交进仓库的 blob 本来就是 LF，所以加上本文件**不需要重写任何内容**——
+# 它只影响后续 checkout 的结果。
+* text=auto eol=lf

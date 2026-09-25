@@ -178,11 +178,11 @@ def _make_root(tmp: Path, script_body: str, *, extra_entries: int = 0) -> tuple[
     module_dir = tmp / "tools" / "automation-modules" / "demo" / "hello"
     module_dir.mkdir(parents=True)
     main = module_dir / "hello.py"
-    main.write_text(script_body, encoding="utf-8")
+    main.write_text(script_body, encoding="utf-8", newline="\n")
     entries = ["tools/automation-modules/demo/hello/hello.py"]
     for index in range(extra_entries):
         other = module_dir / f"other{index}.py"
-        other.write_text("print('other')\n", encoding="utf-8")
+        other.write_text("print('other')\n", encoding="utf-8", newline="\n")
         entries.append(f"tools/automation-modules/demo/hello/other{index}.py")
     module = {
         "category": "demo",

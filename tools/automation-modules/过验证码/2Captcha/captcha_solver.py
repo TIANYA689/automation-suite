@@ -18,7 +18,7 @@
 # 替代品位置与用法：
 #   tools/automation-modules/过验证码/合规验证码挑战模块/README.md
 #   作业侧的接入例子：
-#   projects/20260925-avalon-register-login/scripts/fetch_manual_inputs.py
+#   projects/20260925-avalon/scripts/fetch_manual_inputs.py
 # ---------------------------------------------------------------------------
 
 """

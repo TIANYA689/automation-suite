@@ -40,7 +40,7 @@ class CliExtractionTests(unittest.TestCase):
     def _spec(self):
         with tempfile.TemporaryDirectory() as raw:
             script = Path(raw) / "sample.py"
-            script.write_text(textwrap.dedent(SAMPLE_SCRIPT), encoding="utf-8")
+            script.write_text(textwrap.dedent(SAMPLE_SCRIPT), encoding="utf-8", newline="\n")
             return extract_cli(script)
 
     def test_reads_top_level_options(self) -> None:
@@ -66,7 +66,7 @@ class CliExtractionTests(unittest.TestCase):
     def test_unparsable_script_returns_none(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             script = Path(raw) / "broken.py"
-            script.write_text("def (:\n", encoding="utf-8")
+            script.write_text("def (:\n", encoding="utf-8", newline="\n")
             self.assertIsNone(extract_cli(script))
 
 
@@ -78,7 +78,7 @@ class DriftDetectionTests(unittest.TestCase):
         self.root = Path(self._temp.name)
         (self.root / "scripts").mkdir()
         (self.root / "scripts" / "tool.py").write_text(
-            textwrap.dedent(SAMPLE_SCRIPT), encoding="utf-8"
+            textwrap.dedent(SAMPLE_SCRIPT), encoding="utf-8", newline="\n"
         )
         self._original_root = check_commands.ROOT
         check_commands.ROOT = self.root
@@ -89,7 +89,7 @@ class DriftDetectionTests(unittest.TestCase):
 
     def _run(self, markdown: str) -> dict:
         doc = self.root / "README.md"
-        doc.write_text(textwrap.dedent(markdown), encoding="utf-8")
+        doc.write_text(textwrap.dedent(markdown), encoding="utf-8", newline="\n")
         return run()
 
     def test_valid_command_passes(self) -> None:
@@ -122,7 +122,7 @@ class DriftDetectionTests(unittest.TestCase):
             "parser.add_argument('--verbose', action='store_true')\n"
             "sub = parser.add_subparsers(dest='command')\n"
             "sub.add_parser('run')\n",
-            encoding="utf-8",
+            encoding="utf-8", newline="\n",
         )
         report = self._run("```bash\npython scripts/loose.py --verbose\n```\n")
         self.assertTrue(report["ok"], report["drifts"])
@@ -191,10 +191,10 @@ class DriftDetectionTests(unittest.TestCase):
     def test_docs_snapshot_resolves_against_tools_mirror(self) -> None:
         mirror = self.root / "tools" / "modules" / "alpha"
         mirror.mkdir(parents=True)
-        (mirror / "main.py").write_text("import argparse\n", encoding="utf-8")
+        (mirror / "main.py").write_text("import argparse\n", encoding="utf-8", newline="\n")
         doc = self.root / "docs" / "modules" / "alpha" / "README.md"
         doc.parent.mkdir(parents=True)
-        doc.write_text("```bash\npython main.py\n```\n", encoding="utf-8")
+        doc.write_text("```bash\npython main.py\n```\n", encoding="utf-8", newline="\n")
         self.assertTrue(run()["ok"])
 
     def test_placeholder_is_exempt(self) -> None:

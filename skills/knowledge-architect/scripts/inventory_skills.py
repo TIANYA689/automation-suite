@@ -126,7 +126,8 @@ def write_atomic(path: Path, content: str, force: bool) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(f"{path.name}.tmp")
     try:
-        temporary.write_text(content, encoding="utf-8")
+        # newline="\n"：Windows 默认会把 \n 翻成 \r\n，让产物在跨平台下不一致。
+        temporary.write_text(content, encoding="utf-8", newline="\n")
         temporary.replace(path)
     finally:
         if temporary.exists():
