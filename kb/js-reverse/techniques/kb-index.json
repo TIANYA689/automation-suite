@@ -1,0 +1,55 @@
+{
+  "version": "1.0",
+  "purpose": "JS 逆向知识库的信号索引。条目 signals 用于把需求文本映射到具体技术文件；priority 用于同分排序。",
+  "entries": [
+    {
+      "id": "obfuscation-signals",
+      "signals": [
+        "混淆", "反混淆", "解混淆", "_0x", "字符串数组", "控制流平坦化", "cff",
+        "eval打包", "ob混淆", "aaencode", "jjencode", "jsfuck", "自防御",
+        "selfdefending", "死代码", "代理函数", "字符串切片", "混淆类型", "美化"
+      ],
+      "files": ["01-obfuscation-signals.md"],
+      "priority": 10
+    },
+    {
+      "id": "crypto-fingerprints",
+      "signals": [
+        "签名", "加密算法", "md5", "sha", "hmac", "aes", "des", "rsa", "base64",
+        "cryptojs", "密钥", "iv", "填充", "时间戳", "参数拼接", "验签", "算法还原",
+        "密文", "十六进制", "jwt"
+      ],
+      "files": ["02-crypto-fingerprints.md"],
+      "priority": 10
+    },
+    {
+      "id": "jsvmp-paths",
+      "signals": [
+        "jsvmp", "vmp", "虚拟机保护", "字节码", "解释器", "操作码", "opcode",
+        "虚拟pc", "混淆vm", "自定义vm", "路径a", "路径b", "四板斧", "插桩",
+        "源码级插桩", "反追踪"
+      ],
+      "files": ["03-jsvmp-paths.md"],
+      "priority": 10
+    },
+    {
+      "id": "env-emulation-diff",
+      "signals": [
+        "环境伪装", "环境补全", "补环境", "jsdom", "沙箱环境", "指纹", "navigator",
+        "webdriver", "plugins", "tostring", "native code", "window.chrome",
+        "环境检测", "无头检测", "silent", "静默拒绝", "反检测"
+      ],
+      "files": ["04-env-emulation-diff.md"],
+      "priority": 9
+    },
+    {
+      "id": "transform-validation",
+      "signals": [
+        "改写验证", "语义等价", "等价验证", "回归", "diff", "候选版本",
+        "常量折叠", "词法绑定", "副作用", "求值顺序", "var提升", "分析副本"
+      ],
+      "files": ["05-transform-validation.md"],
+      "priority": 9
+    }
+  ]
+}

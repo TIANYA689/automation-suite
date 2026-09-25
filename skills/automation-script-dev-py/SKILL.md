@@ -1,8 +1,6 @@
 ---
 name: automation-script-dev-py
-description: "Python 自动化脚本开发专家。负责创建、分析、调试和适配 Python 脚本，支持青龙面板和本地运行。"
-metadata:
-  version: "6.2.0"
+description: "创建、分析、调试和适配 Python 自动化脚本，支持青龙面板、本地 CLI、Windows 启动器与本地运维面板。用于多账号、登录授权、注册验证、邮箱/代理适配、多阶段协议工作流、并发批次、凭证生命周期、状态缓存和可观测交付。"
 ---
 
 
@@ -73,47 +71,47 @@ asyncio.run(main())
 ## 🔑 核心模式索引 (Pattern Index)
 
 > 相似模式已融合到编号更靠前的主模式中。保留编号用于稳定引用，子场景使用 `P主编号.序号`。
-> 历史编号兼容映射：`旧 P12 → P1`，`旧 P13 → P2`，`旧 P3 → P3`，`旧 P14 → P4`，`旧 P15 → P5`，`旧 P1 → P6`，`旧 P6 → P7`，`旧 P4 → P8`，`旧 P2 → P9`，`旧 P32 → P10`，`旧 P7 → P11`，`旧 P5 → P12`。原先被融合的模式继续归入对应主模式子场景。
+> 历史编号兼容映射：`旧 P12 → P1`，`旧 P13 → P2`，`旧 P33 → P2.3`，`旧 P3 → P3`，`旧 P14 → P4`，`旧 P15 → P5`，`旧 P1 → P6`，`旧 P6 → P7`，`旧 P4 → P8`，`旧 P2 → P9`，`旧 P32 → P10`，`旧 P7 → P11`，`旧 P5 → P12`。原先被融合的模式继续归入对应主模式子场景。
 
 #### A. 代理、防封与客户端伪装
 
 | # | 模式名称 | 关键词 | 跨语言 |
 |:---:|:---|:---|:---:|
-| P1 | 代理集成与代理兼容 | 代理池、自动换 IP、系统代理旁路、httpx `proxy` | ✅ JS-P1.1 |
-| P2 | 高级防封与客户端伪装 | `AntiDetection`、UA 设备池、高斯延迟、拟真轨迹 | ✅ JS-P2 |
+| P1 | 代理集成与代理兼容 | 代理池、健康评分、认证转发、系统代理旁路、httpx `proxy` | ✅ JS-P1.1 |
+| P2 | 高级防封与客户端伪装 | `AntiDetection`、UA 设备池、账号级设备档案、高斯延迟、拟真轨迹 | ✅ JS-P2 |
 
 #### B. 账号、登录与授权
 
 | # | 模式名称 | 关键词 | 跨语言 |
 |:---:|:---|:---|:---:|
 | P3 | 多源账号配置与加载 | 环境变量、文件、来源切换、去重 | — |
-| P4 | 智能登录与授权策略 | Token 优先、状态缓存、两阶段授权 | ✅ JS-P3.1 |
+| P4 | 智能登录与授权策略 | Token 优先、状态缓存、凭证转换/刷新/巡检 | ✅ JS-P3.1 |
 
 #### C. 注册与验证
 
 | # | 模式名称 | 关键词 | 跨语言 |
 |:---:|:---|:---|:---:|
-| P5 | 注册与验证码接入 | 无验证码注册、邮箱/短信接码、reCAPTCHA | ✅ JS-P4.1 |
+| P5 | 注册与验证码接入 | 注册阶段、邮箱/短信适配、验证码来源过滤、合规挑战处理 | ✅ JS-P4.1 |
 
 #### D. 网络请求、协议与安全
 
 | # | 模式名称 | 关键词 | 跨语言 |
 |:---:|:---|:---|:---:|
-| P6 | 网络请求、重试与协议构造 | 自动重试、快速熔断、Multipart | — |
+| P6 | 网络请求、重试与协议构造 | 自动重试、快速熔断、Multipart、多阶段协议状态机 | — |
 | P7 | 安全工具与签名 | RSA、UUID、设备指纹、哈希索引签名 | ✅ JS-P5.1 |
 
 #### E. 任务编排、并发与循环
 
 | # | 模式名称 | 关键词 | 跨语言 |
 |:---:|:---|:---|:---:|
-| P8 | 任务编排、并发与循环 | 条件分支、线程池、进度等待、服务端倒计时 | ✅ JS-P6 |
+| P8 | 任务编排、并发与循环 | 条件分支、线程池、进度等待、批次运行记录、取消清理 | ✅ JS-P6 |
 
 #### F. 配置、兼容与项目组织
 
 | # | 模式名称 | 关键词 | 跨语言 |
 |:---:|:---|:---|:---:|
 | P9 | 集中配置与运行兼容 | `Config`、双源覆盖、Windows UTF-8 | — |
-| P10 | 单脚本项目文件夹归集 | 同名文件夹、README、配置示例、数据文件 | ✅ JS-P7 |
+| P10 | 项目归集与本地操作面 | 同名文件夹、README、配置示例、本地面板、Windows 启动器 | ✅ JS-P7 |
 
 #### G. 日志、隐私与通知
 
@@ -250,6 +248,12 @@ client = httpx.Client(proxy=None)  # 不使用代理时传 None
 async with httpx.AsyncClient(proxy="http://127.0.0.1:7890", verify=False) as client: ...
 ```
 
+#### P1.3 健康感知代理池与认证转发
+
+当代理来自文件、订阅或带认证上游时，不要把“随机选一条”当成可用性策略。维护标准化代理记录、预检结果、连续失败数、冷却时间和最近成功时间；浏览器不支持认证代理时，通过仅监听回环地址的本地转发器桥接。
+
+读取 `references/registration-automation-patterns.md` 的“P1.3 健康感知代理池与认证转发”，按其中的失败归因和验收表实现。不得在日志、状态文件或异常文本中输出代理用户名和密码。
+
 ### P2: 高级防封与客户端伪装
 
 🔗 **跨语言通用** — JS 版见 `automation-script-dev-js` P2
@@ -297,9 +301,9 @@ def playwright_human_drag(page, from_x, from_y, distance, easing=None):
 ```
 > **要点**: 步数随机 22-32 | 三选一缓动函数 | Y 轴 ±2px 抖动 | 50% 概率超频补偿回退
 
-#### P2.1 独立模块化 UA 生成器
+#### P2.1 自动化注册专用 UA 生成器
 
-**适用场景**: 需要跨项目复用、或与 `core_network.py` 结合的独立 UA 生成逻辑  
+**适用场景**: 仅限自动化注册流程；在每个注册流程开始时生成一次，并在该流程内固定复用。普通签到、领取、养号、已有账号登录和会话刷新不得使用本模式，必须按 P2.3 加载账号绑定的真实设备档案。
 **HAR 来源**: 真实抓包特征 —  `Mozilla/5.0 (Linux; Android 15; V1936A Build/JXI6.35992; wv) AppleWebKit/537.36 ... Chrome/144.0.4911.115 Mobile Safari/537.36`
 
 ```python
@@ -316,7 +320,7 @@ _DEVICE_POOL = {
 _CHROME_VERSIONS = ["144.0.4911.115","116.0.5845.163","120.0.6099.144","114.0.5735.196","118.0.5993.80","122.0.6261.105"]
 
 def generate_android_ua() -> str:
-    """生成随机 Android WebView UA，完全模拟真实设备指纹"""
+    """为一次自动化注册流程生成 Android WebView UA。"""
     android_ver = random.randint(10, 15)
     model, build = random.choice(random.choice(list(_DEVICE_POOL.values())))
     chrome = random.choice(_CHROME_VERSIONS)
@@ -331,17 +335,19 @@ import httpx
 from ua_generator import generate_android_ua
 
 class APIClient:
-    def __init__(self, base_url="", proxy=None):
+    def __init__(self, base_url="", proxy=None, user_agent=None):
         self._client = httpx.Client(proxy=proxy, verify=False)  # ⚠️ 见 P1.2
+        self._user_agent = user_agent or generate_android_ua()
     def _build_headers(self, extra=None):
-        h = {"User-Agent": generate_android_ua(), "Accept-Encoding": "gzip, deflate, br"}
+        h = {"User-Agent": self._user_agent, "Accept-Encoding": "gzip, deflate, br"}
         if extra: h.update(extra)
         return h
     def get(self, ep, **kw): return self._client.get(f"{self.base_url}{ep}", headers=self._build_headers(), **kw)
     def post(self, ep, **kw): return self._client.post(f"{self.base_url}{ep}", headers=self._build_headers(), **kw)
 ```
 **要点**:
-- 每次请求时重新调用 `generate_android_ua()`，保证同一会话多次请求指纹随机不重复
+- 每个自动化注册流程只调用一次 `generate_android_ua()`；同一流程的请求、重试和重定向复用该 UA
+- 本模式不得用于普通签到、领取、养号、已有账号登录或会话刷新；这些长期账号场景统一使用 P2.3
 - `ua_generator.py` 作为纯工具模块可直接被 `requests` / `httpx` / `aiohttp` 任意框架引入
 - 设备池可按业务需求扩充：只需在 `_DEVICE_POOL` 中添加 `(model, build_id)` 元组
 
@@ -355,6 +361,12 @@ DELAY_SETTINGS = {
 AntiDetection.human_delay(*DELAY_SETTINGS["ACTION"])  # 解包调用
 def random_sleep(self, key="ACTION"): AntiDetection.human_delay(*DELAY_SETTINGS.get(key,(1,2)))
 ```
+
+#### P2.3 账号级设备指纹持久化（旧 P33）
+
+普通签到、领取、养号、已有账号登录和会话刷新默认都是长期账号养护，必须为每个账号使用固定的真实设备档案，不得每次运行或每次请求随机 UA。档案优先从该账号实际使用的真机抓包或受信配置中导入并原子写入 `data/device_profiles/`，后续运行持续复用。优先使用稳定、非敏感的账号 ID 作为索引；只有无法取得稳定 ID 时才使用 Token 的 SHA-256 摘要，且不得保存或记录原 Token。
+
+读取 `references/device-profile-persistence.md`，按其中的档案 schema、导入/加载流程、UA 与 Client Hints 一致性规则、并发写入和轮换边界实现。只有自动化注册流程可以使用 P2.1 随机 UA；档案缺失、损坏、schema 不兼容或认证失败时也不得静默生成新指纹。
 
 ---
 
@@ -498,6 +510,12 @@ def save_session(context, state_file: Path):
 ```
 > AES跨语言对齐: Python 使用 `Crypto.Util.Padding.pad(style='pkcs7')` + `MODE_ECB/CBC`
 
+#### P4.2 凭证生命周期与可逆导入导出
+
+当产物不止一个 Token，而是包含会话、访问令牌、刷新令牌和过期时间的凭证文档时，拆分 `normalize → validate → refresh → probe → export/delete`。导入前预览并判重，刷新使用原子写，健康探测限制并发，导出后删除必须是显式独立动作。
+
+读取 `references/registration-automation-patterns.md` 的“P4.2 凭证生命周期与可逆导入导出”。所有凭证文件默认加入 `.gitignore`，列表和日志只显示脱敏标识。
+
 ---
 
 **C. 注册与验证**
@@ -515,18 +533,17 @@ password = "".join(random.choices("abcdef0123456789",k=10))
 
 #### P5.1 邮箱接码客户端
 
-首选方案: `24mail.chacuo.net`（免费、无需 API Key）
-
 ```python
-class TempMailClient:
-    API_URL = "http://24mail.chacuo.net/"
-    def __init__(self, domain="chacuo.net", proxy=None): ...
-    def generate_email(self) -> str:   # GET首页→解析初始username, 后续调 renew
-    def wait_for_email(self, timeout=300, interval=8, subject_filter=None):  # 轮询+随机抖动
-    def extract_code(self, email, pattern=r"\d{4,6}") -> Optional[str]:  # HTML→纯文本→主题
-    def get_verification_code(self, timeout=120, **kw) -> Optional[str]:  # 一站式
+class MailboxAdapter:
+    def create_address(self): ...
+    def list_messages(self, mailbox): ...
+    def get_message(self, mailbox, message_id): ...
+
+def wait_for_code(adapter, mailbox, requested_at, timeout=180, interval=5):
+    # 按时间、收件人、发件人/主题特征和业务格式过滤，见 P5.4。
+    ...
 ```
-**要点**: 首页 GET 建立 Session | `arg` 参数需 URL 编码 | 轮询间隔加 `random.uniform(-1,1.5)` 抖动
+**要点**: 提供方实现隔离 | 凭证不写日志 | 轮询有超时与抖动 | 验证码选择遵循 P5.4
 
 #### P5.2 手机号接码客户端
 
@@ -540,15 +557,22 @@ class SMSClient:  # / TaxinClient
     def cancel(self, project_id, phone): ...   # 释放号码
 ```
 
-#### P5.3 reCAPTCHA 打码集成
+#### P5.3 合规挑战处理
 
 ```python
-class CaptchaSolver:
-    def solve_recaptcha(self, site_key, page_url, timeout=120, poll_interval=5) -> Optional[str]:
-        # 1. POST /in.php → 获取 task_id
-        # 2. 轮询 /res.php 直到 status==1 (CAPCHA_NOT_READY 正常等待)
+class ChallengeProvider:
+    def acquire(self, context, timeout=120) -> Optional[str]:
+        # 仅接入目标服务允许的官方验证、用户手动完成或经明确授权的提供方。
+        # 返回值与当前会话、页面、出口绑定；不得伪造或跨会话复用。
+        ...
 ```
-**要点**: 轮询 5-8s | 超时 120s | `ERROR_CAPTCHA_UNSOLVABLE` 立即终止 | 每次约 $0.003
+**要点**: 记录等待/成功/过期状态 | 设置超时和并发上限 | token 单次消费 | 不实现绕过、伪造或隐藏验证行为
+
+#### P5.4 多邮箱适配、故障切换与验证码来源过滤
+
+统一邮箱接口为 `create_address()`、`list_messages()`、`get_message()`、`wait_code()`；只有邮箱提供方故障或域名拒绝才切换提供方，业务注册失败不得误归因到邮箱。验证码按任务开始时间、收件人、发件人/主题特征和格式共同过滤，避免取到旧信或同邮箱的其他验证码。
+
+读取 `references/registration-automation-patterns.md` 的“P5.4 多邮箱适配、故障切换与验证码来源过滤”。
 
 ---
 
@@ -627,6 +651,12 @@ def request_with_proxy_retry(self, method, url, **kwargs):
 - 刷新代理后重置请求重试计数。
 - 最终失败抛给账号级 `run()`，直接跳过当前账号后续任务，避免空轮询。
 
+#### P6.4 多阶段协议工作流
+
+当流程跨多个域、Cookie、重定向或协议编码时，把实现拆成显式阶段，不在一个 `register()` 中混合全部请求。每阶段声明输入、输出、可重试性和失败类型；同一业务会话复用 Cookie 容器，重试不得重复提交非幂等阶段。
+
+读取 `references/registration-automation-patterns.md` 的“P6.4 多阶段协议工作流”。仅在用户对目标系统有授权时分析或实现协议自动化；验证码和访问控制遵循 P5.3。
+
 ### P7: 安全工具与签名
 
 ```python
@@ -641,8 +671,10 @@ class SecurityProvider:
 class DeviceManager:
     POOLS = {0:("xiaomi",["23116PN5BC"]), 1:("samsung",["SM-S9280"])}
     @classmethod
-    def get_ua(cls, phone): return generate_android_ua()  # 调用 P2.1 独立生成器
+    def get_ua(cls, profile): return headers_from_profile(profile)["User-Agent"]  # 已有账号使用 P2.3
 ```
+
+自动化注册可以在流程开始时注入一次 P2.1 生成的 UA；已有账号不得在签名或请求阶段重新生成设备身份。
 
 #### P7.1 哈希索引签名
 
@@ -779,6 +811,12 @@ results = await asyncio.gather(*(run_guarded(a, i) for i, a in enumerate(account
 
 **适用**: `aiohttp/httpx.AsyncClient`、广告上报、高频查询、批量签到。
 
+#### P8.7 可观测批次运行器
+
+批量注册、转换或巡检任务使用稳定 `run_id`，保存计划、worker 状态、事件流、产物索引和最终汇总。限制同时活动批次数，支持协作式取消；取消或异常退出时回收浏览器、子进程、本地端口和临时文件，并保留足够证据用于定位失败阶段。
+
+读取 `references/registration-automation-patterns.md` 的“P8.7 可观测批次运行器”。
+
 ---
 
 **F. 配置、兼容与项目组织**
@@ -841,6 +879,12 @@ if sys.platform=='win32': sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encod
   .env.example
   accounts.example.json
 ```
+
+#### P10.1 本地操作面与 Windows 启动器
+
+当脚本需要非开发者长期运行时，可提供本地 Web/TUI 操作面和 PowerShell/批处理启动器。默认只监听 `127.0.0.1`，远程暴露前必须启用认证；启动器负责项目内虚拟环境、必要依赖、配置模板、目录创建、端口探测、健康检查和日志落盘，不全局安装依赖。
+
+读取 `references/registration-automation-patterns.md` 的“P10.1 本地操作面与 Windows 启动器”。操作面至少提供单任务互斥、开始/停止、状态、脱敏产物列表与显式删除；下载接口必须验证安全文件名并限制到产物目录。
 
 ---
 
@@ -1024,34 +1068,65 @@ project/
 
 ## Instruction for Agent
 
-使用此技能或新建自动化项目时，**必须先询问用户**以下 Checklist，确认后才能开始编码：
+使用此技能或新建自动化项目时，必须先完成以下 Checklist。先根据需求、HAR、现有脚本和项目文件自动填写已知项，只向用户询问仍影响实现的缺口；不得重复询问已有答案。Checklist 确认且 Pattern Coverage Gate 中不存在 `pending` 后才能开始编码。
 
-1. **目标平台**: 青龙面板 / 本地运行
-2. **环境变量名**: 大写下划线命名 (`APP_TOKEN`)
-3. **账号格式**: 分隔符 (`\n` / `&` / `#`)
-4. **防封需求**: 随机UA/设备指纹/高斯延迟？→ P2（含 P2.1 UA 与 P2.2 延迟）
-5. **智能登录**: Token优先+自动刷新？→ P4
-6. **代理**: 需要IP轮换？→ P1（是否需要双层重试封装？）
-7. **并发**: 多账号并发？→ P8（上限20）
-8. **通知**: 通知渠道？→ P12
-9. **短信验证码**: 需要接码？→ P5.2；无需则使用 P5 主流程（随机注册）
-10. **邮箱验证**: 需要邮箱接码？→ P5.1（24mail）
-11. **reCAPTCHA**: 需要过码？→ P5.3
-12. **配置标准化**: 默认使用 P9.1（双源配置）+ P2.2（延迟字典）
-13. **账号加载**: 文件+环境变量两源？→ P3.1；需区分来源开关？→ P3.2
-14. **服务端倒计时**: 是否需要自动等下一轮领取？→ P8.4（服务端时间 + 最大轮数）
-15. **代理旁路**: 开发环境有抓包工具？→ 默认开启 P1.1
-16. **Multipart**: API 使用 `multipart/form-data`？→ P6.2
-17. **异常处理**: 网络多次断开且需要直接切换下个账号？→ P6.1
-18. **既有脚本基线**: 当前目录有同类 Python 脚本？→ 先按 P13.1 做 Pattern Mining
-19. **状态缓存**: 是否需要 token/积分/进度历史？→ P13.3
+1. **目标平台与运行兼容**: 青龙面板 / 本地 CLI / Windows / 其他；Windows 控制台与中文路径 → P9/P9.2。
+2. **环境变量名**: 大写下划线命名（`APP_TOKEN`）；用户配置与环境变量双源覆盖 → P9.1。
+3. **账号格式**: 分隔符（`\n` / `&` / `#`）与字段 schema；多格式校验、去重和错误示例 → P3/P3.3。
+4. **设备身份**: 普通签到/领取/养号/已有账号登录默认按 P2/P2.3 使用账号绑定的真机固定指纹；只有自动化注册流程使用 P2.1 随机 UA，且单次注册流程内固定。
+5. **智能登录与授权**: Token 优先、失效回退、两阶段 Code 兑换 → P4/P4.1；刷新、巡检、导入导出 → P4.2。
+6. **代理与网络环境**: 单代理/轮换 → P1；抓包或系统代理旁路 → P1.1；`httpx proxy=` 版本兼容 → P1.2；健康评分、认证转发或父代理 → P1.3；请求重试后换代理 → P6.3。
+7. **任务编排与并发**: 条件分支 → P8/P8.1；多账号并发上限 20 → P8.2；结果保持原账号顺序 → P8.5；异步限流 → P8.6。
+8. **通知与公告**: 通知渠道、失败隔离和汇总 → P12；公告主备地址 → P12.1。
+9. **注册与短信验证**: 是否为注册流程 → P5；短信接码 → P5.2；没有短信不等于跳过其他注册校验。
+10. **邮箱验证**: 单邮箱适配 → P5.1；多提供方故障切换与验证码来源过滤 → P5.4。
+11. **挑战验证**: 是否存在官方、用户手动或明确授权的验证流程 → P5.3；否则停止，不实现绕过。
+12. **配置与节奏基线**: 所有项目评估 P9/P9.1；远端多步骤流程默认使用 P2.2 场景化延迟，单接口任务可标记 `skip`。
+13. **账号加载**: 文件+环境变量两源 → P3.1；来源切换 → P3.2；兼容历史格式 → P3.3。
+14. **等待与循环**: 需要可见的单线程等待 → P8.3；按服务端倒计时领取下一轮 → P8.4，并设置最大轮数/截止时间。
+15. **代理旁路与客户端兼容**: 开发环境有抓包工具时评估 P1.1；使用 `httpx` 时强制检查 P1.2。
+16. **协议格式与请求签名**: `multipart/form-data` → P6.2；RSA/AES/UUID/通用签名 → P7；哈希索引签名 → P7.1。
+17. **请求与异常处理**: 所有远端请求评估 P6；重试耗尽后跳过账号 → P6.1；代理双层重试 → P6.3。
+18. **既有脚本基线**: 当前目录有同类 Python 脚本时先执行 P13/P13.1；按 P13.2 判断成熟度，达到平台阈值时使用 P13.4。
+19. **状态缓存**: Token、积分、进度、checkpoint 或跨运行历史 → P13.3。
+20. **复杂注册/协议流程**: 跨阶段、域名、Cookie、重定向或协议编码 → P6.4，并与 P5 的验证阶段组合。
+21. **凭证生命周期**: 转换、刷新、健康巡检、导入导出与显式删除 → P4.2。
+22. **代理池**: 多来源、健康评分、认证转发、冷却与父代理 → P1.3；与 P6.3 分工，避免重复重试层。
+23. **批次运行**: run 历史、worker 状态、取消、资源清理和产物对账 → P8.7。
+24. **项目组织、操作面与日志**: 脚本同名目录和交付文件 → P10；Web/TUI/Windows 启动器 → P10.1；结构化日志与汇总 → P11；敏感信息脱敏 → P11.1；并发日志 → P11.2。
+
+### Pattern Coverage Gate
+
+<!-- pattern-coverage:start -->
+覆盖 ID（必须逐项标记 `apply` / `skip` / `pending`）：P1, P1.1, P1.2, P1.3, P2, P2.1, P2.2, P2.3, P3, P3.1, P3.2, P3.3, P4, P4.1, P4.2, P5, P5.1, P5.2, P5.3, P5.4, P6, P6.1, P6.2, P6.3, P6.4, P7, P7.1, P8, P8.1, P8.2, P8.3, P8.4, P8.5, P8.6, P8.7, P9, P9.1, P9.2, P10, P10.1, P11, P11.1, P11.2, P12, P12.1, P13, P13.1, P13.2, P13.3, P13.4。
+<!-- pattern-coverage:end -->
+
+编码前创建 Pattern 应用矩阵：
+
+| Pattern | 状态 | 触发信号或 skip 理由 | 实现位置 | 验收证据 |
+|:---|:---:|:---|:---|:---|
+| Pn(.n) | apply/skip/pending | 来自需求、HAR 或既有代码 | 文件/函数 | 测试/命令/报告 |
+
+- `apply`：必须进入实施计划，并在交付时给出实现位置和验证证据。
+- `skip`：必须写明不适用理由；不能只写“未使用”。
+- `pending`：表示仍缺输入；编码前必须消除，不得带入实现阶段。
+- 主 Pattern 与子 Pattern 分别判定；应用子 Pattern 时主 Pattern 同时标记 `apply`。
+- Pattern 之间冲突时以场景边界为准，例如 P2.1 只用于自动化注册，P2.3 用于长期账号养护。
+
+**常见场景默认组合**:
+
+- 签到/领取/养号：P2.3 + P3 + P4 + P6 + P8.1/P8.4 + P9 + P10 + P11；有通知加 P12，有跨运行状态加 P13.3。
+- 自动化注册：P2.1 + P5 + P6.4 + P9 + P10 + P11；按输入追加 P1.3、P4.2、P5.1-P5.4、P8.7、P10.1。
+- 多账号并发：P3 + P6 + P8.2/P8.5；异步实现追加 P8.6，并发日志追加 P11.2。
+- 既有脚本重构：P13.1/P13.2 + 对应业务 Pattern；达到演进阈值时追加 P13.4。
 
 **实施流程**:
-1. 分析 HAR/脚本，区分"业务逻辑"和"基础设施逻辑"；若有既有脚本，先按 P13.1 分类抽取 pattern
-2. 选择范式（简单→函数式; 复杂→OOP; 高性能→异步）
-3. 新增紧密相关文件时，先按 P10 创建/使用脚本同名文件夹，并把主脚本、README、示例配置、数据文件集中放置；主脚本名优先使用中文业务名，例如 `Cloud 云矿机养号脚本.py`
-4. 按 P9.1 配置标准化，P2.2 设延迟字典，P3.1 设账号加载
-5. 应用确认过的高级模式；遇到服务端倒计时类签到/养号，优先应用 P8.4
-6. 多账号并发默认应用 P8.5；异步并发默认应用 P8.6；需要历史/断点续跑默认应用 P13.3
-7. README 用**中文**编写，包含运行方式、环境变量、依赖、账号格式、示例配置和排错说明；不要写入个人联系方式、真实 token 或项目专属链接。
+1. 分析 HAR、需求和既有脚本，区分业务逻辑与基础设施；有既有脚本时先按 P13.1/P13.2 建立基线。
+2. 完成 24 项 Checklist 和全量 Pattern 应用矩阵，消除所有 `pending`。
+3. 选择范式（简单→函数式；复杂→OOP；高性能→异步），把所有 `apply` Pattern 写入实施计划。
+4. 按 P10 创建/使用脚本同名目录；所有项目评估 P6、P9、P11，相关子 Pattern 按矩阵实施。
+5. 普通签到/养号按 P2.3 固定真机档案；只有自动化注册使用 P2.1。复杂注册或凭证任务按需读取 `references/registration-automation-patterns.md`。
+6. 多账号并发应用 P8.2/P8.5；异步并发追加 P8.6；批次任务按 P8.7 保存脱敏运行证据。
+7. 实现完成后逐项回填 Pattern 矩阵的文件/函数位置与测试、命令或报告证据；没有证据的 `apply` 不算完成。
+8. README 用中文编写，包含运行方式、环境变量、依赖、账号格式、示例配置和排错说明；不要写入个人联系方式、真实 Token 或项目专属链接。
 

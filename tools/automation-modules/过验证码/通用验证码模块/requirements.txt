@@ -1,0 +1,15 @@
+# 通用验证码模块依赖
+
+# AI SDK（按服务商选装）
+zhipuai>=2.0.1
+
+# 滑块和图片处理
+ddddocr>=1.4.9
+Pillow>=10.0.0
+numpy>=1.24.0
+
+# 浏览器自动化集成
+playwright>=1.40.0
+
+# 可选：captcha-recognizer 安装成功时会优先用于滑块缺口识别
+# captcha-recognizer>=0.1.0

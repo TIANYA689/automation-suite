@@ -7,7 +7,7 @@
 | 职责 | Skill | 说明 |
 |---|---|---|
 | 需求分析、语言/方向选择、交付质量门 | automation-architect | 唯一上层路由 |
-| Python 自动化脚本开发/重构 | automation-script-dev-py | 业务脚本结构、账号、请求、并发、通知 |
+| Python 自动化脚本开发/重构 | automation-script-dev-py | 业务脚本结构、账号、请求、注册、邮箱/代理适配、凭证、批次运行、通知 |
 | JavaScript/Node 自动化脚本开发/重构 | automation-script-dev-js | 青龙/Node/UserScript/Env 类脚本 |
 | Python 源码保护 | python-obfuscator-pro | 保护、配置区明文、版本验证 |
 | Python 解密/脱壳 | python-script-decryptor | 静态解包、逐层 dump、报告 |
@@ -29,6 +29,20 @@
 - 可交付：当前环境的 `outputs/`、项目 `exports/`、`reports/` 或用户指定目录。
 - 自动化脚本项目：脚本同名目录，包含主脚本、README、`.env.example`、示例账号/配置。
 - 保护/解密任务：保留原始文件、最终文件、报告；中间层按需保留或清理。
+
+## Pattern 覆盖门禁
+
+自动化开发路由到 Python 或 JavaScript 叶子技能后，必须读取该技能 `pattern-coverage:start/end` 标记间的完整 Pattern ID 清单，并生成应用矩阵：
+
+| Pattern | 状态 | 触发信号或 skip 理由 | 实现位置 | 验收证据 |
+|---|---|---|---|---|
+| Pn(.n) | apply/skip/pending | 需求、HAR、既有代码或不适用边界 | 文件/函数 | 测试/命令/报告 |
+
+- 编码前消除全部 `pending`。
+- `skip` 必须有场景理由；不能因实现成本或遗漏而跳过。
+- 所有 `apply` 必须进入实施计划，交付前补齐实现位置和验收证据。
+- 不强制每个项目实现所有 Pattern；强制全量判定并应用所有适用 Pattern。
+- 使用 `python scripts/misc/check_pattern_coverage.py` 验证叶子技能定义与覆盖清单没有差集。
 
 ## knowledge-architect 相融结论
 

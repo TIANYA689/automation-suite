@@ -1,0 +1,65 @@
+{
+  "version": "1.0",
+  "purpose": "跨领域方法论知识库的信号索引。",
+  "entries": [
+    {
+      "id": "evidence-closure",
+      "signals": [
+        "证据", "闭环", "可复查", "复现", "验收", "交付检查", "长任务", "恢复点",
+        "断点续做", "三态", "已排除", "死路", "不确定项", "已知限制", "沉淀", "反注水"
+      ],
+      "files": ["01-evidence-closure.md"],
+      "priority": 10
+    },
+    {
+      "id": "long-task-discipline",
+      "signals": [
+        "长任务", "多轮", "判定漂移", "漂移", "活记录", "上下文衰减", "上下文丢失",
+        "交接", "handover", "恢复任务", "单变量", "复合实验", "对照构建", "零改动对照",
+        "超时", "等待上界", "观察窗口", "窗口污染", "截图证据", "令牌", "退出码",
+        "约束轴", "交付形态", "免提权", "持久化", "分发自包含", "重新推导", "重走死路"
+      ],
+      "files": ["02-long-task-discipline.md"],
+      "priority": 10
+    },
+    {
+      "id": "verification-ladder",
+      "signals": [
+        "验证", "做完", "完成标准", "主张阶梯", "验收", "验证级别", "控制组",
+        "回归", "相邻功能", "结构差异", "结构验证", "运行验证", "行为验证",
+        "报告模板", "残留", "反模式", "签名校验", "冷启动", "崩溃循环"
+      ],
+      "files": ["03-verification-ladder.md"],
+      "priority": 10
+    },
+    {
+      "id": "coverage-and-limits",
+      "signals": [
+        "覆盖", "覆盖边界", "覆盖范围", "不覆盖", "能力", "能力闭包", "依赖",
+        "未探测", "不具备", "强度标签", "observed", "inferred", "unverified",
+        "历史验证", "已验证", "推断", "已授权样本", "空白", "边界声明"
+      ],
+      "files": ["04-coverage-and-limits.md"],
+      "priority": 10
+    },
+    {
+      "id": "precedent-records",
+      "signals": [
+        "案例", "案例体裁", "precedent", "执行链", "死胡同", "可复用模式",
+        "回写", "复盘", "经验沉淀", "断言分级", "坑点目录", "一次收敛"
+      ],
+      "files": ["05-precedent-records.md"],
+      "priority": 9
+    },
+    {
+      "id": "symptom-index-and-capability-matrix",
+      "signals": [
+        "症状索引", "能力矩阵", "查找层", "一跳可达", "覆盖清单", "路线清单",
+        "案例库", "状态三档", "partial", "强度标注", "知识组织", "索引设计",
+        "豁免项", "工具被测量", "路线被测量"
+      ],
+      "files": ["06-symptom-index-and-capability-matrix.md"],
+      "priority": 9
+    }
+  ]
+}

@@ -22,8 +22,58 @@ jobs:
       - name: Install uv
         run: python -m pip install uv
 
+      # 索引是派生产物（已 gitignore），路由相关检查都依赖它，必须先重建。
+      - name: Build routing index
+        run: python scripts/automation/build_routing_index.py
+
       - name: Public release check
         run: python scripts/misc/public_release_check.py
 
-      - name: MCP smoke check
+      - name: Case state validation
+        run: python scripts/misc/validate_case_states.py
+
+      # 作业区索引是派生产物，与各作业的 job.json 必须一致。
+      - name: Project workspace check
+        run: python scripts/misc/check_projects.py
+
+      - name: Pattern coverage check
+        run: python scripts/misc/check_pattern_coverage.py
+
+      - name: Routing drift check
+        run: python scripts/misc/check_routing_drift.py
+
+      # 文档真实性六项。它们回答的是不同问题，分开跑以便定位失败。
+      - name: Command truth check
+        run: python scripts/misc/check_commands.py
+
+      - name: Cross-reference check
+        run: python scripts/misc/check_doc_refs.py
+
+      - name: Index completeness check
+        run: python scripts/misc/check_index.py
+
+      # 预算度量默认只出 warning（--strict 才会让 warning 失败），
+      # 这样"旗舰技能逼近上限"会被看见但不会把 CI 变红。
+      - name: Document budget check
+        run: python scripts/misc/check_budget.py
+
+      - name: Tool inventory check
+        run: python scripts/misc/check_tool_inventory.py
+
+      - name: Findings library validation
+        run: python scripts/misc/ai_finding.py validate
+
+      - name: Install module test dependencies
+        shell: bash
+        run: |
+          requirements="$(python scripts/misc/run_offline_tests.py --print-requirements)"
+          if [ -n "$requirements" ]; then
+            python -m pip install $requirements
+          fi
+
+      - name: Offline unit tests
+        run: python scripts/misc/run_offline_tests.py --strict
+
+      # 无 mcp 时该脚本自行跳过，不构成门禁。
+      - name: MCP stdio smoke check
         run: python scripts/misc/mcp_smoke_check.py

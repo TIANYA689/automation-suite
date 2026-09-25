@@ -1,0 +1,16 @@
+---
+description: Automation Suite project protocol and safe operating rules
+alwaysApply: true
+---
+
+# Automation Suite Project Rules
+
+Before any project work, read `AI-USAGE.md` in full. It is the authoritative project protocol; this rule only adapts it for Cursor.
+
+At session start, inspect `cases/<slug>/state.json` and continue from `next_steps`. When no case applies, use or create `cases/ad-hoc/`. State the concrete artifact to obtain before implementation.
+
+Consult `kb/**/techniques/` and the matching project skill before implementing. Use `rg --files` and local validation scripts for inventory, and perform static decrypt/deobfuscate checks before handling protected code.
+
+Use PowerShell with literal paths. Preserve existing changes, check Git status before writing, and never overwrite source artifacts. Do not execute unknown payloads. Keep secrets in `.env`, access them through environment variables, and keep `.env` ignored by Git.
+
+Do not delete files, commit, push, publish, or share content without explicit authorization. Keep changes within the request. Store relevant artifacts in `exports/` or `reports/`, preserve originals with backups, and include paths plus hashes, signals, or verification commands in every conclusion.

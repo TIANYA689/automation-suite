@@ -1,0 +1,349 @@
+{
+  "version": 4,
+  "description": "路由单一事实源。技能触发信号、角色、调用模式与模块分类集中在此；routing.index.json 由本文件 + 磁盘扫描生成，Markdown 路由表由其校验。注意：裸语言词（python/js/node）不列入 signals，由语言检测器统一处理并用于消歧，避免压过具体意图。知识库文件级路由由各 kb/*/techniques/kb-index.json 维护，与本文件是两层关系（技能层 / 知识层）。",
+  "skills": {
+    "automation-architect": {
+      "role": "router",
+      "invocation": "automatic",
+      "priority": 10,
+      "languages": [],
+      "signals": [
+        "需求不清",
+        "需求不明确",
+        "技术选型",
+        "选型",
+        "多技能",
+        "协同",
+        "路由",
+        "架构",
+        "方案",
+        "验收",
+        "交付检查",
+        "自动化套件",
+        "har",
+        "抓包",
+        "curl",
+        "接口分析",
+        "外部模块文档"
+      ]
+    },
+    "automation-script-dev-py": {
+      "role": "leaf",
+      "invocation": "automatic",
+      "priority": 20,
+      "languages": ["python"],
+      "signals": [
+        "py脚本",
+        "青龙",
+        "多账号",
+        "签到",
+        "养号",
+        "领取",
+        "注册脚本",
+        "批量注册",
+        "凭证",
+        "登录授权",
+        "代理池",
+        "接码",
+        "收邮箱",
+        "短信验证码",
+        "设备指纹",
+        "协议注册",
+        "并发",
+        "批次运行",
+        "通知推送",
+        "定时任务",
+        "本地面板",
+        "windows启动器"
+      ]
+    },
+    "automation-script-dev-js": {
+      "role": "leaf",
+      "invocation": "automatic",
+      "priority": 20,
+      "languages": ["javascript"],
+      "signals": [
+        "js脚本",
+        "env类",
+        "surge",
+        "loon",
+        "quanx",
+        "quantumult",
+        "userscript",
+        "油猴",
+        "青龙js",
+        "cryptojs",
+        "签名计算",
+        "滑块"
+      ]
+    },
+    "python-obfuscator-pro": {
+      "role": "leaf",
+      "invocation": "automatic",
+      "priority": 30,
+      "languages": ["python"],
+      "signals": [
+        "加密",
+        "混淆",
+        "保护源码",
+        "保护脚本",
+        "保护自有",
+        "交付保护",
+        "源码保护",
+        "python混淆",
+        "python保护",
+        "混淆py",
+        "base64压缩",
+        "marshal",
+        "配置区明文",
+        "可回滚备份"
+      ]
+    },
+    "js-script-obfuscator": {
+      "role": "leaf",
+      "invocation": "automatic",
+      "priority": 30,
+      "languages": ["javascript"],
+      "signals": [
+        "加密",
+        "混淆",
+        "保护源码",
+        "保护脚本",
+        "保护自有",
+        "交付保护",
+        "源码保护",
+        "js混淆",
+        "javascript-obfuscator",
+        "控制流扁平化",
+        "字符串数组",
+        "防调试",
+        "死代码"
+      ]
+    },
+    "python-script-decryptor": {
+      "role": "leaf",
+      "invocation": "automatic",
+      "priority": 30,
+      "languages": ["python"],
+      "signals": [
+        "解密",
+        "脱壳",
+        "解混淆",
+        "还原源码",
+        "python壳",
+        "exec提取",
+        "多层压缩",
+        "fernet",
+        "字节码探测",
+        "dump",
+        "pyc还原"
+      ]
+    },
+    "js-script-deobfuscator": {
+      "role": "leaf",
+      "invocation": "automatic",
+      "priority": 30,
+      "languages": ["javascript"],
+      "signals": [
+        "解密",
+        "脱壳",
+        "解混淆",
+        "还原源码",
+        "js壳",
+        "_0x",
+        "字符串数组还原",
+        "沙盒执行",
+        "eval分析",
+        "破解obfuscator",
+        "控制流恢复",
+        "jsvmp",
+        "虚拟机保护",
+        "补环境",
+        "环境伪装",
+        "jsdom",
+        "混淆类型",
+        "反调试",
+        "hook分析",
+        "改写验证",
+        "自防御"
+      ]
+    },
+    "binary-symbol-recovery": {
+      "role": "leaf",
+      "invocation": "automatic",
+      "priority": 30,
+      "languages": [],
+      "signals": [
+        "符号恢复",
+        "函数名恢复",
+        "去符号",
+        "stripped",
+        "无符号",
+        "结构体恢复",
+        "结构体",
+        "字段偏移",
+        "交叉引用",
+        "调用图",
+        "反编译",
+        "伪代码",
+        "魔数",
+        "常量指纹",
+        "算法盲识别",
+        "so文件",
+        "dll",
+        "elf",
+        "固件",
+        "二进制分析",
+        "虚表",
+        "vtable"
+      ]
+    },
+    "emulated-execution-debug": {
+      "role": "leaf",
+      "invocation": "automatic",
+      "priority": 30,
+      "languages": [],
+      "signals": [
+        "模拟执行",
+        "仿真执行",
+        "unicorn",
+        "跑通函数",
+        "跨架构",
+        "arm64",
+        "mips",
+        "syscall模拟",
+        "jni模拟",
+        "调用约定",
+        "内存映射",
+        "片段执行",
+        "寄存器状态",
+        "脱机执行"
+      ]
+    },
+    "apk-reverse-analysis": {
+      "role": "leaf",
+      "invocation": "automatic",
+      "priority": 30,
+      "languages": [],
+      "signals": [
+        "apk",
+        "dex",
+        "smali",
+        "字节码结构",
+        "加壳",
+        "加固",
+        "壳",
+        "加固识别",
+        "完整性校验",
+        "校验边界",
+        "重打包",
+        "重签名",
+        "签名校验",
+        "结构校验",
+        "split apk",
+        "app bundle",
+        "方法体清空",
+        "归属判定",
+        "门禁归属",
+        "证书固定",
+        "无 schema",
+        "protobuf",
+        "动态注册",
+        "jni 约定",
+        "泄漏扫描",
+        "分析卫生"
+      ]
+    },
+    "knowledge-architect": {
+      "role": "leaf",
+      "invocation": "manual-only",
+      "priority": 40,
+      "languages": [],
+      "signals": [
+        "沉淀经验",
+        "经验固化",
+        "固化方法",
+        "更新知识",
+        "知识库",
+        "同步技能",
+        "知识漂移",
+        "写入skill",
+        "提炼经验",
+        "方法论沉淀"
+      ]
+    }
+  },
+  "module_categories": {
+    "接码": {
+      "signals": ["接码", "短信", "手机号", "短信验证码", "sms", "豪猪", "他信", "云码"],
+      "consumers": ["automation-script-dev-py", "automation-script-dev-js"]
+    },
+    "过验证码": {
+      "signals": ["验证码", "captcha", "滑块", "2captcha", "挑战验证", "人机验证"],
+      "consumers": ["automation-script-dev-py", "automation-script-dev-js"]
+    },
+    "邮箱": {
+      "signals": ["邮箱", "email", "临时邮箱", "收信", "邮件", "mail", "24mail"],
+      "consumers": ["automation-script-dev-py", "automation-script-dev-js"]
+    }
+  },
+  "routing_rules": [
+    {
+      "id": "R1",
+      "when": ["写脚本", "开发脚本", "改脚本", "自动化脚本", "重构脚本"],
+      "then": ["automation-architect"],
+      "note": "先经架构师做需求分析与选型，再进叶子技能"
+    },
+    {
+      "id": "R2",
+      "when": ["har", "抓包", "curl"],
+      "then": ["automation-architect"],
+      "note": "先做 API 证据分析，再开发"
+    },
+    {
+      "id": "R3",
+      "when": ["加密", "混淆", "保护源码"],
+      "then": ["python-obfuscator-pro", "js-script-obfuscator"],
+      "note": "按语言二选一"
+    },
+    {
+      "id": "R4",
+      "when": ["解密", "还原", "脱壳", "解混淆"],
+      "then": ["python-script-decryptor", "js-script-deobfuscator"],
+      "note": "按语言二选一"
+    },
+    {
+      "id": "R5",
+      "when": ["沉淀", "固化", "同步技能"],
+      "then": ["knowledge-architect"],
+      "note": "仅用户明确要求时触发"
+    },
+    {
+      "id": "R6",
+      "when": ["符号恢复", "结构体", "反编译", "无符号"],
+      "then": ["binary-symbol-recovery"],
+      "note": "静态语义恢复；需要跑起来验证时再转 emulated-execution-debug"
+    },
+    {
+      "id": "R7",
+      "when": ["模拟执行", "unicorn", "跑通函数"],
+      "then": ["emulated-execution-debug"],
+      "note": "无设备条件下执行片段；静态定名不足时先转 binary-symbol-recovery"
+    },
+    {
+      "id": "R8",
+      "when": ["apk", "加固", "壳", "dex", "重打包", "签名校验", "归属判定"],
+      "then": ["apk-reverse-analysis"],
+      "note": "只做识别、度量与判定，不做绕过；需要符号级静态恢复时转 binary-symbol-recovery，需要跑片段时转 emulated-execution-debug"
+    }
+  ],
+  "execution": {
+    "enabled": true,
+    "default_dry_run": true,
+    "allowlist": [],
+    "timeout_seconds": 120,
+    "max_output_chars": 8000,
+    "audit_log": "exports/automation/module-audit.jsonl",
+    "note": "allowlist 为空表示任何模块都不可执行。启用某个模块需在此显式列出其名称，然后重建索引。默认 dry_run=true，只解析命令不执行。"
+  }
+}

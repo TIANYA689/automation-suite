@@ -1,0 +1,43 @@
+{
+  "version": "1.0",
+  "purpose": "二进制逆向知识库的信号索引。条目 signals 用于把需求文本映射到具体技术文件；priority 用于同分排序。",
+  "entries": [
+    {
+      "id": "symbol-recovery",
+      "signals": [
+        "符号恢复", "函数名", "去符号", "stripped", "无符号", "交叉引用", "xref",
+        "成对调用", "导入表", "导出表", "反编译", "伪代码", "魔数", "函数识别", "命名"
+      ],
+      "files": ["01-symbol-recovery.md"],
+      "priority": 10
+    },
+    {
+      "id": "struct-recovery",
+      "signals": [
+        "结构体", "struct", "类布局", "字段偏移", "offset", "虚表", "vtable",
+        "链表节点", "引用计数", "内存布局", "访问模式", "对象重建"
+      ],
+      "files": ["02-struct-recovery.md"],
+      "priority": 10
+    },
+    {
+      "id": "emulated-execution",
+      "signals": [
+        "模拟执行", "unicorn", "仿真", "emulation", "跑通函数", "跨架构",
+        "arm64", "mips", "x86", "syscall", "jni", "stub", "内存映射",
+        "寄存器", "调用约定", "片段执行"
+      ],
+      "files": ["03-emulated-execution.md"],
+      "priority": 9
+    },
+    {
+      "id": "algorithm-identification",
+      "signals": [
+        "算法识别", "盲识别", "未知加密", "sbox", "s-box", "熵", "重合指数",
+        "kasiski", "ecb", "cbc", "分组模式", "差分", "变体实现", "查表"
+      ],
+      "files": ["04-algorithm-identification.md"],
+      "priority": 9
+    }
+  ]
+}

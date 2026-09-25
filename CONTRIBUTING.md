@@ -1,6 +1,6 @@
 # Contributing
 
-感谢你愿意改进 Automation Suite。这个项目包含自动化脚本开发、代码保护、解密/解混淆和 MCP 工具，请确保所有贡献都来自授权场景。
+感谢你愿意改进 Automation Suite。这个项目包含自动化脚本开发、代码保护和解密/解混淆能力，请确保所有贡献都来自授权场景。
 
 ## 基本要求
 
@@ -13,7 +13,6 @@
 
 ```powershell
 python scripts/misc/public_release_check.py
-python scripts/misc/mcp_smoke_check.py
 ```
 
 ## Pull Request 建议

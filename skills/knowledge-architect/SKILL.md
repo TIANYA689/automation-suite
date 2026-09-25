@@ -48,6 +48,35 @@ version: "2.0.0"
 - 需要获取当前技能清单时运行 `scripts/inventory_skills.py`，不要依赖本文件中的静态版本表。
 - 修改后使用 `evals/trigger-evals.json` 和 `evals/output-evals.json` 检查边界与质量。
 
+## 本项目的知识资产与维护责任
+
+本套件的知识分三层，各有唯一维护入口。固化前先判断候选属于哪一层，不要跨层复制。
+
+| 层 | 载体 | 维护方式 |
+|---|---|---|
+| 技能层 | `skills/<name>/SKILL.md` 与 `references/` | 流程、契约、判据；改触发信号要同步 `routing.source.json` |
+| 知识层 | `kb/<领域>/techniques/*.md` | 可复用的技术知识；每篇由 `kb-index.json` 的 signals 索引 |
+| 经验层 | `kb/ai-findings/findings.jsonl` | 零散可检索的发现与坑点，允许随时追加 |
+
+维护动作：
+
+- **新增知识文件**：在对应 `kb/<领域>/techniques/kb-index.json` 的 `entries` 中登记 `id / signals / files / priority`，否则 `kb_router.py` 检索不到。
+- **登记信号**：`signals` 要写"用户会怎么说"，不是文件里的术语；同一个信号不要跨条目重复登记，否则路由分不出主次。
+- **追加经验**：`python scripts/misc/ai_finding.py add ...`；一条 finding 被反复验证后，提炼进 `kb/*/techniques/`，并把该 finding 的 `status` 改为 `superseded`，在 `detail` 指向新技术文件。
+- **改路由**：只改 `routing.source.json`，然后重建索引并跑漂移检查。
+
+```bash
+python scripts/automation/build_routing_index.py      # 重建技能索引
+python scripts/misc/check_routing_drift.py            # 校验 4 处 Markdown 路由表
+python scripts/misc/kb_router.py "<需求>" --verify     # 校验知识层路由与文件存在性
+python scripts/misc/ai_finding.py validate            # 校验经验层记录
+```
+
+**漂移红线**：新增或改名技能后，必须同步 `SKILLS.md`、`AI-USAGE.md`、`skills/automation-architect/SKILL.md`、`kb/automation/techniques/01-routing.md` 四处；漂移检查会对"声明了但磁盘缺失""磁盘有但未声明""文档未提及某技能"报错。
+
+**反注水**：一次任务没有产生新的通用技巧，就只留 case 记录，不往知识层塞内容。知识层的每一条都要能回答"下次出现什么信号时该读它"。
+
+
 ## 工作流
 
 ### 1. 建立候选

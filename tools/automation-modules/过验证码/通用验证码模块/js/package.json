@@ -1,0 +1,12 @@
+{
+  "name": "unified-captcha-js",
+  "version": "1.0.0",
+  "description": "通用滑块验证码 Node.js 重试管理器",
+  "main": "slider_captcha_manager.js",
+  "scripts": {
+    "test": "node -e \"const M=require('./slider_captcha_manager'); const m=new M({debug:false,fixedOffset:1,maxAttempts:1}); m.execute(async()=>({id:'demo'}), async(id, offset)=>offset===1).then(()=>console.log('js selfcheck passed'))\""
+  },
+  "dependencies": {
+    "axios": "^1.13.6"
+  }
+}

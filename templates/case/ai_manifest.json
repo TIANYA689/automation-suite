@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "case": "case",
+  "skill": "js-script-deobfuscator",
+  "goal": "用一句话写清本次要拿到什么，不写过程",
+  "status": "CONTINUE",
+  "inputs": [
+    {
+      "path": "样本或需求文件路径（相对仓库根，样本放 exports/ 或 notes/）",
+      "sha256": "留空表示尚未计算；已计算的必须填"
+    }
+  ],
+  "steps_done": [
+    {
+      "step": "已完成的一步，写清做了什么",
+      "evidence": "这一步的证据落在哪个文件/行/地址"
+    }
+  ],
+  "evidence": [
+    {
+      "path": "证据文件路径",
+      "note": "这条证据支持哪个结论"
+    }
+  ],
+  "dead_ends": [
+    {
+      "path": "被排除的路径",
+      "reason": "被什么证据排除（必填，防止下次重复走）"
+    }
+  ],
+  "next_actions": [
+    "下一步动作；status 为 CONTINUE 时至少一条"
+  ],
+  "open_questions": [
+    "尚未解决的问题，以及需要什么证据才能解决"
+  ],
+  "updated_at": "2026-09-24"
+}

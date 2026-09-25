@@ -67,7 +67,7 @@ async function sendRequest(url, method, headers, data=null) {
 
 ## 🔑 核心模式索引 (Pattern Index)
 
-> 相似模式已融合并按功能顺序连续编号为 `P1-P7`，子场景使用 `P主编号.序号`。
+> 相似模式已融合并按功能顺序连续编号为 `P1-P8`，子场景使用 `P主编号.序号`。
 > 历史编号兼容映射：`旧 P1/P9 → P1`，`旧 P3/P10/P11 → P2`，`旧 P7/P12 → P3`，`旧 P2/P13 → P4`，`旧 P8/P14 → P5`，`旧 P4/P5/P6 → P6`，`旧 P15 → P7`。
 
 | # | 模式名称 | 关键词 | 跨语言 |
@@ -147,18 +147,23 @@ async function requestAPI({ url, method='GET', headers={}, data=null, timeout=15
 
 ```javascript
 const loginData = {
-    phone, password, device_id: crypto.randomBytes(8).toString('hex'),
-    device_info: { hardware:'thyme', manufacturer:'Xiaomi', model:'thyme', sdk_int:33, brand:'Xiaomi', os_release:'13', platform:'android' }
+    phone, password, device_id: accountDeviceProfile.device_id,
+    device_info: accountDeviceProfile.device_info
 };
 ```
 
-#### P2.1 随机 UA 池
+已有账号从持久化的真机设备档案构造 `loginData`；只有自动化注册流程可以随机创建身份，且单次流程内固定。
+
+#### P2.1 自动化注册专用随机 UA 池
+
+仅限自动化注册流程使用。每个注册流程开始时选择一次并在流程内固定；普通签到、领取、养号、已有账号登录和会话刷新必须使用账号绑定的真机固定设备档案，规则与 schema 见 Python P2.3。
 
 ```javascript
 function getRandomUserAgent() {
     const pool = ["Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 ...)", "Mozilla/5.0 (Windows NT 10.0 ...)"];
     return pool[Math.floor(Math.random()*pool.length)];
 }
+const registrationUserAgent = getRandomUserAgent(); // 本次注册流程内复用
 // 外部API: axios.get("http://ck.tfapi.cn/ua.php").then(r => r.data.user_agent)
 ```
 
@@ -438,17 +443,31 @@ console.log(`📱 账号${idx}: token=${mask(token)} status=${status}`);
 
 ## Instruction for Agent
 
-1. **Checklist**: 编码前**必须询问**用户：
-   - **防封**: 随机UA/设备指纹/延迟？→ P2
-   - **智能登录**: Token优先？→ P3.1
-   - **代理**: IP轮换？→ P1.1（需双层重试封装？）
-   - **短信验证码**: 注册需要？NO → P4.1（随机号）
-   - **既有脚本基线**: 当前目录有同类 JS 脚本？YES → 先按 P8 分类抽取，再开发/重构
-2. 默认 Node.js 环境
-3. **范式选择**: 青龙多平台 → Env类范式；纯Node.js → Standalone
-4. 新增紧密相关文件时，先按 P7 创建/使用脚本同名文件夹，并把主脚本、README、示例配置、数据文件集中放置；主脚本名优先使用中文业务名，例如 `Cloud 云矿机养号脚本.js`
-5. 高度混淆脚本 → 使用 `js-script-deobfuscator` 技能
-6. 所有日志使用 Emoji 规范
-7. 单文件脚本也必须在 README 或 `package.json` 写明依赖；UserScript 任务使用 P8.3
-8. README 用**中文**，包含运行方式、环境变量、依赖、账号格式、示例配置和排错说明；不要写入个人联系方式、真实 token 或项目专属链接。
+使用此技能或新建 JavaScript 自动化项目时，先根据需求、HAR、现有脚本和目标运行时自动填写已知项，只询问仍影响实现的缺口；不得重复询问已有答案。Checklist 确认且 Pattern Coverage Gate 中不存在 `pending` 后才能编码。
+
+1. **平台与范式**: 青龙/Surge/Loon/QuanX → Env 类范式；纯 Node.js → Standalone；UserScript → P8.3。
+2. **请求与代理**: 基础请求、重试和代理 → P1；双格式代理及失败换 IP → P1.1；请求配置对象化和错误分层 → P1.2。
+3. **设备身份与节奏**: 普通签到/养号使用账号绑定的真机固定档案 → P2/Python P2.3；只有自动化注册使用 P2.1 随机 UA，且流程内固定；动态请求头与延迟 → P2.2。
+4. **登录与会话**: CookieJar、Token 优先和账密回退 → P3；智能登录策略 → P3.1。
+5. **注册与验证**: 注册流程 → P4；无需短信验证码的注册分支 → P4.1；邮箱、短信和挑战等扩展验证按 Python P5.1-P5.4 规则实现。
+6. **签名与加密**: 通用签名计算 → P5；哈希索引签名 → P5.1；其他 RSA/AES/UUID 规则参考 Python P7。
+7. **任务、批处理与通知**: 任务编排和批处理 → P6；优雅退出 → P6.1；任务列表映射 → P6.2；长运行状态机 → P6.3；多通知渠道隔离 → P6.4。
+8. **项目组织**: 新增紧密相关文件时应用 P7，集中主脚本、中文 README、`.env.example`、依赖和示例配置。
+9. **既有脚本与质量基线**: 先应用 P8/P8.1 分类；配置头和账号格式 → P8.2；UserScript → P8.3；依赖清单 → P8.4；日志脱敏 → P8.5。
+10. **跨语言能力**: JS 无原生 Pattern 的场景必须显式评估对应 Python Pattern，采用同等语义或记录 `skip` 理由，不能因编号不存在而漏掉设备档案、复杂协议、批次可观测性和本地操作面。
+
+### Pattern Coverage Gate
+
+<!-- pattern-coverage:start -->
+覆盖 ID（必须逐项标记 `apply` / `skip` / `pending`）：P1, P1.1, P1.2, P2, P2.1, P2.2, P3, P3.1, P4, P4.1, P5, P5.1, P6, P6.1, P6.2, P6.3, P6.4, P7, P8, P8.1, P8.2, P8.3, P8.4, P8.5。
+<!-- pattern-coverage:end -->
+
+| Pattern | 状态 | 触发信号或 skip 理由 | 实现位置 | 验收证据 |
+|:---|:---:|:---|:---|:---|
+| Pn(.n) | apply/skip/pending | 来自需求、HAR 或既有代码 | 文件/函数 | 测试/命令/报告 |
+
+- `apply` 必须进入实施计划并回填实现及验证证据；`skip` 必须给出不适用理由；编码前不得存在 `pending`。
+- 应用子 Pattern 时主 Pattern 同时标记 `apply`。设备身份冲突时，注册使用 P2.1，长期账号使用 Python P2.3 语义。
+- 默认 Node.js 环境；高度混淆输入先交给 `js-script-deobfuscator`，不直接继承不可读实现。
+- 单文件脚本也必须在 README 或 `package.json` 写明依赖；README 使用中文，不写个人联系方式、真实 Token 或项目专属链接。
 

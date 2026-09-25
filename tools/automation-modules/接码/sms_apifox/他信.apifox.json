@@ -1,0 +1,16 @@
+{
+  "apifoxProject": "1.0",
+  "info": {
+    "name": "他信接码模块（脱敏接口清单）",
+    "description": "示例凭据、Token 和账户数据已移除；运行配置请使用 .env。"
+  },
+  "baseUrl": "http://api.my531.com",
+  "endpoints": [
+    {"name": "登录", "method": "GET", "path": "/Login/", "query": ["username", "password", "type=json"]},
+    {"name": "查询余额", "method": "GET", "path": "/Balance/", "query": ["token", "type=json"]},
+    {"name": "获取号码", "method": "GET", "path": "/GetPhone/", "query": ["token", "id", "isp", "card", "area", "type=json"]},
+    {"name": "获取短信", "method": "GET", "path": "/GetMsg/", "query": ["token", "id", "phone", "dev", "type=json"]},
+    {"name": "释放号码", "method": "GET", "path": "/Cancel/", "query": ["token", "id", "phone", "type=json"]},
+    {"name": "加黑号码", "method": "GET", "path": "/Addblack/", "query": ["token", "id", "phone", "type=json"]}
+  ]
+}

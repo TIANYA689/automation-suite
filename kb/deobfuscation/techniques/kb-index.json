@@ -1,0 +1,16 @@
+{
+  "version": "1.0",
+  "purpose": "解包与解混淆知识库的信号索引。",
+  "entries": [
+    {
+      "id": "static-first",
+      "signals": [
+        "解包", "脱壳", "解混淆", "静态优先", "payload 提取", "dump",
+        "不执行未知载荷", "包装层", "转换链", "层级证据", "payload 长度",
+        "payload 哈希"
+      ],
+      "files": ["01-static-first.md"],
+      "priority": 10
+    }
+  ]
+}

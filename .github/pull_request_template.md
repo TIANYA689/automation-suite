@@ -12,7 +12,6 @@
 
 ```powershell
 python scripts/misc/public_release_check.py
-python scripts/misc/mcp_smoke_check.py
 ```
 
 ## Notes

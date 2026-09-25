@@ -1,0 +1,12 @@
+{
+  "case": "case",
+  "goal": "一句话目标",
+  "status": "in_progress",
+  "artifacts": [
+    "本次产出的文件路径"
+  ],
+  "next_steps": [
+    "下一步"
+  ],
+  "updated_at": "2026-09-24"
+}

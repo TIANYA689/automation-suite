@@ -1,0 +1,88 @@
+{
+  "version": "1.0",
+  "purpose": "Android / APK 逆向知识库的信号索引。条目 signals 用于把需求文本映射到具体技术文件；priority 用于同分排序。",
+  "entries": [
+    {
+      "id": "apk-and-dex-structure",
+      "signals": [
+        "APK", "容器", "dex", "字节码", "结构", "校验和", "adler32", "sha1",
+        "对齐", "zip", "resources.arsc", "重打包", "重签名", "签名", "apksigner",
+        "split", "App Bundle", "改动审计", "等长替换", "差异", "diff", "classdiff",
+        "验证器", "VerifyError", "move-result", "安装失败", "INSTALL_FAILED"
+      ],
+      "files": ["01-apk-and-dex-structure.md"],
+      "priority": 10
+    },
+    {
+      "id": "hardening-identification",
+      "signals": [
+        "加固", "壳", "脱壳", "虚拟化", "保护强度", "识别", "stub", "完整性校验",
+        "校验边界", "边界度量", "native 密度", "方法体清空", "单变量", "对照",
+        "运行时识别", "壳族", "检测", "反调试", "停止点", "识别即止", "自测"
+      ],
+      "files": ["02-hardening-identification.md"],
+      "priority": 10
+    },
+    {
+      "id": "native-layer",
+      "signals": [
+        "原生", "so", "ELF", "JNI", "符号", "导出表", "动态注册", "RegisterNatives",
+        "JNI_OnLoad", "DT_NEEDED", "重定位", "relocation", "映射", "ABI",
+        "翻译层", "追踪", "trace", "插桩", "DBI", "OLLVM", "平坦化", "混淆",
+        "Dart", "AOT", "Flutter", "libapp", "寄存器", "字符串编码", "去混淆"
+      ],
+      "files": ["03-native-layer.md"],
+      "priority": 9
+    },
+    {
+      "id": "protocol-and-attribution",
+      "signals": [
+        "协议", "protobuf", "varint", "无 schema", "解码", "gRPC", "trailers",
+        "QUIC", "HTTP3", "抓包", "证书", "证书固定", "pinning", "TLS",
+        "归属", "门禁", "客户端拥有", "服务端权威", "授权", "端点", "API",
+        "差分", "opcode", "覆盖率", "闭环", "退避"
+      ],
+      "files": ["04-protocol-and-attribution.md"],
+      "priority": 9
+    },
+    {
+      "id": "dynamic-observation",
+      "signals": [
+        "动态观测", "插桩", "hook", "附着", "启动注入", "零事件", "类加载器",
+        "服务化", "RPC", "仿真", "unidbg", "环境桩", "调用约定", "观测边界",
+        "对拍", "工具版本对齐", "事件投递", "块数上限"
+      ],
+      "files": ["06-dynamic-observation.md"],
+      "priority": 9
+    },
+    {
+      "id": "failure-signatures-and-tooling",
+      "signals": [
+        "报错", "失败特征", "日志分析", "校验和错误", "找不到类", "安装失败",
+        "对齐", "签名校验", "环境坑", "工具坑", "按长度去重", "排序守卫",
+        "往返损坏", "编码参数", "shell 展开", "安装成功但没装上", "裸数字码"
+      ],
+      "files": ["07-failure-signatures-and-tooling.md"],
+      "priority": 10
+    },
+    {
+      "id": "evidence-and-attribution-pitfalls",
+      "signals": [
+        "归因", "证据排序", "内部信号", "一次改两处", "缓存回写", "ABI 不匹配",
+        "搜索没找到", "分支极性", "采样不是观测", "负结论", "两次观测",
+        "服务端证书", "静态压运行时", "判据无效"
+      ],
+      "files": ["08-evidence-and-attribution-pitfalls.md"],
+      "priority": 9
+    },
+    {
+      "id": "analysis-hygiene",
+      "signals": [
+        "脱敏", "泄漏", "泄漏扫描", "发布检查", "交付", "交接", "报告",
+        "侦察", "信息收集", "工具不可用", "数据一致性", "设备数据", "分析卫生"
+      ],
+      "files": ["05-analysis-hygiene.md"],
+      "priority": 8
+    }
+  ]
+}
