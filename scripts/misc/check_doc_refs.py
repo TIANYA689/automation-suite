@@ -50,8 +50,6 @@ SKIP_DIR_NAMES = {
     "node_modules",
     "venv",
     ".venv",
-    "原始备份",
-    "skills 原始备份",
 }
 
 # 不参与校验的路径前缀：这些目录是本地产物，新克隆里本来就不存在。

@@ -58,7 +58,6 @@ EXCLUDED_PATHS: tuple[tuple[str, str], ...] = (
     ("tmp/", "临时工作区，不提交"),
     ("exports/", "运行产物与审计日志，不是交付文档"),
     ("cases/", "案例现场，含 backups/ 下的历史副本"),
-    ("skills/skills 原始备份/", "备份目录，不属于套件内正式技能"),
     (".workbuddy-ai/", "代理本地记忆，不进仓库，CI 中不存在"),
 )
 

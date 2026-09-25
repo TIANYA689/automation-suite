@@ -143,10 +143,16 @@ class InventoryTests(unittest.TestCase):
         self._doc("MCP 服务器，1 只读工具 + `run_module`\n", name="reports/old-validation.md")
         self.assertTrue(run()["ok"], run()["drifts"])
 
-    def test_backup_directory_is_out_of_scope(self) -> None:
+    def test_skills_directory_is_in_scope(self) -> None:
+        """`skills/` 下的文档参与工具清单比对。
+
+        这里原本有一条把 `skills/skills 原始备份/` 排除在外的声明，指向的目录已删除，
+        声明随之移除——**留一条指向不存在路径的豁免就是一条悬空声明**，而豁免项
+        最容易变成漂移藏身处（见 `EXCLUDED_PATHS` 的注释）。
+        """
         self._doc(CLEAN_DOC)
-        self._doc("9 个只读工具 `ghost`\n", name="skills/skills 原始备份/SKILL.md")
-        self.assertTrue(run()["ok"], run()["drifts"])
+        self._doc("9 个只读工具 `ghost`\n", name="skills/alpha/SKILL.md")
+        self.assertIn("unknown_tool", self._kinds(run()))
 
     def test_unknown_annotation_is_detected(self) -> None:
         check_tool_inventory.MCP_SERVER.write_text(

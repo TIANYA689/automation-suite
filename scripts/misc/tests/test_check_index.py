@@ -168,11 +168,19 @@ class CompletenessTests(unittest.TestCase):
         (tests / "test_x.py").write_text("x = 1\n", encoding="utf-8", newline="\n")
         self.assertTrue(run()["ok"], run()["drifts"])
 
-    def test_backup_directory_is_not_a_skill(self) -> None:
+    def test_undeclared_skill_directory_is_reported(self) -> None:
+        """`skills/` 下任何目录都被当作技能，没声明就报。
+
+        这里原本是一条「备份目录不算技能」的豁免，指向的目录已删除，豁免随之移除。
+        行为因此变成：多出来的目录会被点名——**这比留一条指向不存在路径的豁免有用**，
+        悬空豁免只会让下一个多余目录静默通过。
+        """
         self._write_index([])
         self._write_routing([])
-        (self.root / "skills" / "skills 原始备份").mkdir(parents=True)
-        self.assertTrue(run()["ok"], run()["drifts"])
+        (self.root / "skills" / "stray").mkdir(parents=True)
+        report = run()
+        self.assertFalse(report["ok"])
+        self.assertIn("skill_undeclared", self._kinds(report))
 
 
 class RealRepositoryTests(unittest.TestCase):

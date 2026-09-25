@@ -61,8 +61,6 @@ SKIP_DIR_NAMES = {
     "reports",
     "cases",
     "notes",
-    "原始备份",
-    "skills 原始备份",
 }
 
 COMMAND_RE = re.compile(r"^(?:\$|>|PS[^>]*>)?\s*(?:python3?|py)\s+(?P<rest>.+)$")

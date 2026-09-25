@@ -37,9 +37,6 @@ SKILLS_ROOT = ROOT / "skills"
 SCRIPTS_ROOT = ROOT / "scripts"
 ROUTING_SOURCE = ROOT / "routing.source.json"
 
-# 不是套件内正式技能，不参与声明校验。
-SKILL_EXCLUDE = {"skills 原始备份"}
-
 # 内部模块与被测试运行器自动发现的用例：不靠"被文档点名"获得存在意义。
 SCRIPT_ORPHAN_EXEMPT: tuple[tuple[str, str], ...] = (
     (
@@ -168,7 +165,7 @@ def _check_skills(drifts: list[dict[str, object]]) -> int:
     on_disk = {
         path.name
         for path in SKILLS_ROOT.iterdir()
-        if path.is_dir() and path.name not in SKILL_EXCLUDE
+        if path.is_dir()
     }
 
     for name in sorted(on_disk - declared):
@@ -255,13 +252,6 @@ def run() -> dict[str, object]:
                 "why": why,
             }
             for prefix, why in SCRIPT_ORPHAN_EXEMPT
-        ]
-        + [
-            {
-                "reason": "not_a_skill",
-                "scope": ", ".join(sorted(SKILL_EXCLUDE)),
-                "why": "备份目录，不属于套件内正式技能",
-            }
         ],
     }
 

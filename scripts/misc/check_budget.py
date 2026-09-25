@@ -101,8 +101,6 @@ HEDGES = (
     "if needed",
 )
 
-SKILL_EXCLUDE = {"skills 原始备份"}
-
 
 def estimate_tokens(text: str) -> int:
     """粗略 token 估计：CJK 按 1 字 1 token，其余按 4 字符 1 token。
@@ -211,7 +209,7 @@ def _measure_skills() -> list[dict[str, object]]:
     if not SKILLS_ROOT.is_dir():
         return measured
     for directory in sorted(SKILLS_ROOT.iterdir()):
-        if not directory.is_dir() or directory.name in SKILL_EXCLUDE:
+        if not directory.is_dir():
             continue
         skill_file = directory / "SKILL.md"
         if not skill_file.is_file():
@@ -257,8 +255,6 @@ def _navigability_notes() -> list[dict[str, object]]:
             candidates.extend(sorted(target.rglob("*.md")))
 
     for path in candidates:
-        if "原始备份" in path.as_posix():
-            continue
         text = _read(path)
         lines = text.splitlines()
         if len(lines) < NAV_MIN_LINES:

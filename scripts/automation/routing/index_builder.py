@@ -23,7 +23,6 @@ SKILLS_DIR = "skills"
 SOURCE_FILE = "routing.source.json"
 INDEX_FILE = "routing.index.json"
 MODULES_DIR = Path("tools") / "automation-modules"
-SKIP_SKILL_DIRS = {"skills 原始备份"}
 MAX_SKILL_BYTES = 256 * 1024
 
 
@@ -122,9 +121,9 @@ def scan_skills(root: Path, source: dict[str, Any]) -> list[dict[str, Any]]:
     entries: list[dict[str, Any]] = []
     read_errors: list[dict[str, str]] = []
 
+    # `skills/` 下每个目录都必须是技能。曾经这里有一条「备份目录不算技能」的豁免，
+    # 指向的目录已删除，豁免随之移除——**缺 `SKILL.md` 该报错，不该静默跳过**。
     for skill_dir in sorted(p for p in skills_root.iterdir() if p.is_dir()):
-        if skill_dir.name in SKIP_SKILL_DIRS:
-            continue
         skill_file = skill_dir / "SKILL.md"
         if not skill_file.is_file():
             read_errors.append({"path": str(skill_file.relative_to(root)), "error": "SKILL.md 缺失"})
