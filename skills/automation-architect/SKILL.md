@@ -300,7 +300,19 @@ project/
 
 ### 本地检查与 CI 门禁
 
-改动落地前跑完整门禁，七项缺一不可：
+改动落地前跑完整门禁。**一条命令跑完 CI 定义的全部步骤**——步骤列表从
+`.github/workflows/ci.yml` **派生**，不在这里另抄一份（两份判据必然漂移）：
+
+```powershell
+python scripts/misc/run_ci_checks.py         # 跑完 CI 定义的全部检查步骤
+python scripts/misc/run_ci_checks.py --list  # 只看派生出了哪些步骤、跳过了哪些
+```
+
+`ci.yml` 只在 GitHub Actions 上执行，而 **Actions 在新建仓库里需要手动启用**
+（`Settings → Actions → General → Allow all actions`）。没启用时，上面这一条命令
+就是**唯一**的执行面——「本地绿 ≠ CI 有效」的反面同样成立：**CI 不跑，本地就是全部**。
+
+要逐条手工跑（例如只想跑一项）：
 
 ```powershell
 python scripts/misc/public_release_check.py          # 合规与必选文件

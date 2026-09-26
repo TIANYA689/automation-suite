@@ -1,0 +1,332 @@
+#!/usr/bin/env python3
+"""本地跑完 CI 定义的全部检查步骤。
+
+为什么需要它：`ci.yml` 只在 GitHub Actions 上执行，而 Actions 在新建仓库里
+**需要手动启用**——没启用时 `README.md` 那句「CI 在 `windows-latest` 上执行以上检查」
+就没有执行面。判据的有效面是**两段**的（判据写对 + 判据真的跑起来），
+第二段在本地等于零。这个脚本把那一段补回来。
+
+判据只有一处：**步骤列表从 `.github/workflows/ci.yml` 派生**，不在这里另抄一份。
+两份判据必然漂移（MEMORY 规则「工具的两半共用同一份判据」）。
+
+取哪些步骤：`run:` 是**单行**且形如 `python <某脚本>.py ...` 的。
+不取的三类**全量打印**——跳过要说出来，否则「本地绿」会静默地比 CI 少一截：
+
+- `uses:` 步骤（checkout / setup-python）——CI 的环境准备，本地已有；
+- `run: |` 多行步骤——都是 `pip install`，是**准备**不是**检查**；
+- `python -m pip install ...`——同上，且隐式改环境。
+
+与 CI 有一处**有意差异**：CI 遇错即停，本脚本默认跑完再汇总（一次看全比逐个修快）；
+要完全对齐用 `--fail-fast`。
+
+本地缺 `mcp` 时 `mcp_smoke_check --require-mcp` 会红——那是**正确**的，
+CI 会先装依赖，本地要自己装：
+
+    python -m pip install -r scripts/automation/routing/requirements.txt
+
+用法：
+
+    python scripts/misc/run_ci_checks.py                  # 跑全部
+    python scripts/misc/run_ci_checks.py --list           # 只列出派生出的步骤
+    python scripts/misc/run_ci_checks.py --only 引用      # 只跑名字/命令含该串的步骤
+    python scripts/misc/run_ci_checks.py --skip mcp       # 跳过名字/命令含该串的步骤
+    python scripts/misc/run_ci_checks.py --fail-fast      # 对齐 CI 的遇错即停
+    python scripts/misc/run_ci_checks.py --json           # 机器可读
+
+零第三方依赖。
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import re
+import shlex
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+WORKFLOW = ROOT / ".github" / "workflows" / "ci.yml"
+
+STEP_RE = re.compile(r"^\s*-\s*name:\s*(?P<name>.+?)\s*$")
+RUN_RE = re.compile(r"^\s*run:\s*(?P<value>\S.*)$")
+CHECK_COMMAND_RE = re.compile(r"^python\s+\S+\.py(?:\s|$)")
+BLOCK_SCALARS = ("|", ">", "|-", ">-", "|+", ">+")
+
+OUTPUT_TAIL_LINES = 12
+
+# 有些步骤的参数是**为 CI 环境写的断言**，照搬到本地会失真。逐条说明并改写，
+# 且**全量打印**——悄悄改参数等于悄悄换判据。
+# 键是步骤名；`test_run_ci_checks.py` 钉住每个键都对应 ci.yml 里真实存在的步骤，
+# 所以 ci.yml 改了步骤名，这里是**测试红**而不是「改写静默失效」。
+LOCAL_OVERRIDES: tuple[tuple[str, str, str], ...] = (
+    (
+        "Case state validation",
+        "python scripts/misc/validate_case_states.py",
+        "CI 里 `cases/` 一个文件都没有（被 .gitignore 挡住），`--expect-cases 0` 是"
+        "**对 CI 环境的断言**；本地 `cases/` 有真实作业，带它必然红。"
+        "本地跑同一支脚本、去掉那句环境断言。",
+    ),
+)
+
+
+def _blocks(text: str) -> list[tuple[str, list[str]]]:
+    """把工作流切成 (步骤名, 该步骤的所有行)。"""
+    blocks: list[tuple[str, list[str]]] = []
+    name: str | None = None
+    lines: list[str] = []
+
+    for line in text.splitlines():
+        match = STEP_RE.match(line)
+        if match:
+            if name is not None:
+                blocks.append((name, lines))
+            name, lines = match.group("name"), []
+            continue
+        if name is not None:
+            lines.append(line)
+
+    if name is not None:
+        blocks.append((name, lines))
+    return blocks
+
+
+def derive_steps(text: str) -> tuple[list[dict[str, str]], list[dict[str, str]]]:
+    """把 `ci.yml` 拆成 (要跑的步骤, 跳过的步骤)。
+
+    **完整记账**：`steps + skipped` 等于文件里所有 `- name:` 步骤——
+    一个步骤不许凭空消失，否则「本地等价」就是一句空话。
+    """
+    steps: list[dict[str, str]] = []
+    skipped: list[dict[str, str]] = []
+
+    for name, lines in _blocks(text):
+        run_value: str | None = None
+        for line in lines:
+            match = RUN_RE.match(line)
+            if match:
+                run_value = match.group("value").strip()
+                break
+
+        if run_value is None:
+            skipped.append(
+                {"name": name, "command": "", "why": "无 run（uses 类环境准备步骤）"}
+            )
+        elif run_value in BLOCK_SCALARS:
+            skipped.append(
+                {"name": name, "command": run_value, "why": "多行 run（安装类准备步骤）"}
+            )
+        elif CHECK_COMMAND_RE.match(run_value):
+            steps.append({"name": name, "command": run_value})
+        else:
+            skipped.append(
+                {
+                    "name": name,
+                    "command": run_value,
+                    "why": "不是 `python <脚本>.py` 形式的检查",
+                }
+            )
+
+    return steps, skipped
+
+
+def apply_local_overrides(
+    steps: list[dict[str, str]],
+) -> tuple[list[dict[str, str]], list[dict[str, str]]]:
+    """按 `LOCAL_OVERRIDES` 把「CI 环境断言」换成本地等价物。
+
+    返回 (改写后的步骤, 改写记录)。改写记录要全量打印——**改了参数就是改了判据**，
+    不说出来就等于偷偷换了一把尺子。
+    """
+    table = {name: (command, why) for name, command, why in LOCAL_OVERRIDES}
+    rewritten: list[dict[str, str]] = []
+    applied: list[dict[str, str]] = []
+
+    for step in steps:
+        override = table.get(step["name"])
+        if override is None:
+            rewritten.append(step)
+            continue
+        command, why = override
+        applied.append(
+            {
+                "name": step["name"],
+                "from": step["command"],
+                "to": command,
+                "why": why,
+            }
+        )
+        rewritten.append({**step, "command": command})
+
+    return rewritten, applied
+
+
+def run_step(step: dict[str, str], timeout: int) -> dict[str, object]:
+    argv = shlex.split(step["command"])
+    argv[0] = sys.executable  # CI 里的 `python` 换成当前解释器，参数原样保留
+    started = time.monotonic()
+    try:
+        completed = subprocess.run(
+            argv, cwd=ROOT, capture_output=True, text=True, timeout=timeout
+        )
+        exit_code = completed.returncode
+        output = (completed.stdout or "") + (completed.stderr or "")
+    except subprocess.TimeoutExpired:
+        exit_code = 124
+        output = f"超时：超过 {timeout} 秒未结束"
+    return {
+        "name": step["name"],
+        "command": step["command"],
+        "exit_code": exit_code,
+        "seconds": round(time.monotonic() - started, 2),
+        "output": output,
+    }
+
+
+def _tail(text: str, lines: int = OUTPUT_TAIL_LINES) -> str:
+    kept = [line for line in text.splitlines() if line.strip()]
+    return "\n".join(kept[-lines:])
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(
+        description="本地跑完 CI 定义的全部检查步骤（步骤列表从 ci.yml 派生）。"
+    )
+    parser.add_argument("--list", action="store_true", help="只列出派生出的步骤，不执行")
+    parser.add_argument("--json", action="store_true", help="输出 JSON")
+    parser.add_argument(
+        "--only", action="append", default=[], help="只跑名字或命令含该串的步骤（可重复）"
+    )
+    parser.add_argument(
+        "--skip",
+        action="append",
+        default=[],
+        help="跳过名字或命令含该串的步骤（可重复）；被跳过的会打印出来",
+    )
+    parser.add_argument("--fail-fast", action="store_true", help="遇错即停（对齐 CI）")
+    parser.add_argument("--verbose", action="store_true", help="成功的步骤也打印完整输出")
+    parser.add_argument("--timeout", type=int, default=900, help="单步超时秒数")
+    args = parser.parse_args(argv)
+
+    if not WORKFLOW.exists():
+        print(f"FAIL: 找不到 {WORKFLOW.relative_to(ROOT).as_posix()}")
+        return 1
+
+    steps, skipped = derive_steps(WORKFLOW.read_text(encoding="utf-8"))
+
+    # 空表守卫：派生不到步骤 = 判据空转（派生规则或工作流结构变了）。
+    # 放在 --only 过滤**之前**，否则用户筛空了也会被当成判据坏了。
+    if not steps:
+        print("FAIL: 没从 ci.yml 派生出任何检查步骤——判据空转（派生规则或工作流结构变了）")
+        return 1
+
+    steps, overrides = apply_local_overrides(steps)
+
+    selected = steps
+    if args.only:
+        selected = [
+            step
+            for step in steps
+            if any(key in step["name"] or key in step["command"] for key in args.only)
+        ]
+        # 筛空也是「空集」：`--only` 打错一个字就变成一次什么都不跑的绿——
+        # 与审计 F5 是同一类缺陷（空集与通过同为 exit=0），必须报错。
+        if not selected:
+            print(f"FAIL: --only {args.only} 没有匹配到任何步骤，拒绝以「空集」充当通过")
+            return 1
+
+    deselected: list[dict[str, str]] = []
+    if args.skip:
+        deselected = [
+            step
+            for step in selected
+            if any(key in step["name"] or key in step["command"] for key in args.skip)
+        ]
+        selected = [step for step in selected if step not in deselected]
+        if not selected:
+            print(f"FAIL: --skip {args.skip} 跳掉了全部步骤，拒绝以「空集」充当通过")
+            return 1
+
+    if args.list:
+        print(f"从 ci.yml 派生出 {len(steps)} 个检查步骤：")
+        for step in steps:
+            print(f"  - {step['name']}：{step['command']}")
+        print(f"\n跳过 {len(skipped)} 个非检查步骤：")
+        for item in skipped:
+            print(f"  - {item['name']}：{item['why']}")
+        if deselected:
+            print(f"\n被 --skip 跳过的 {len(deselected)} 个检查步骤（这些这次没校验）：")
+            for item in deselected:
+                print(f"  - {item['name']}")
+        if overrides:
+            print(f"\n本地改写了 {len(overrides)} 个步骤（CI 环境断言 → 本地等价物）：")
+            for item in overrides:
+                print(f"  - {item['name']}")
+                print(f"      CI：{item['from']}")
+                print(f"      本地：{item['to']}")
+                print(f"      为什么：{item['why']}")
+        return 0
+
+    results: list[dict[str, object]] = []
+    for step in selected:
+        if not args.json:
+            print(f"… {step['name']}", flush=True)
+        result = run_step(step, args.timeout)
+        results.append(result)
+        if not args.json:
+            mark = "PASS" if result["exit_code"] == 0 else "FAIL"
+            print(f"[{mark}] {step['name']}（exit={result['exit_code']}，{result['seconds']}s）")
+            if result["exit_code"] != 0 or args.verbose:
+                body = _tail(str(result["output"]))
+                if body:
+                    print("\n".join(f"      {line}" for line in body.splitlines()))
+        if args.fail_fast and result["exit_code"] != 0:
+            break
+
+    failed = [r for r in results if r["exit_code"] != 0]
+
+    if args.json:
+        print(
+            json.dumps(
+                {
+                    "ok": not failed,
+                    "workflow": WORKFLOW.relative_to(ROOT).as_posix(),
+                    "derived": len(steps),
+                    "ran": len(results),
+                    "failed": [r["name"] for r in failed],
+                    "skipped": skipped,
+                    "deselected": [step["name"] for step in deselected],
+                    "overrides": overrides,
+                    "results": results,
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
+        return 0 if not failed else 1
+
+    print()
+    print(f"派生 {len(steps)} 步，执行 {len(results)} 步，失败 {len(failed)} 步。")
+    if overrides:
+        print(f"本地改写了 {len(overrides)} 个步骤（改了参数就是改了判据，故全量列出）：")
+        for item in overrides:
+            print(f"  - {item['name']}：CI `{item['from']}` → 本地 `{item['to']}`")
+            print(f"      为什么：{item['why']}")
+    print(f"未执行（非检查步骤，共 {len(skipped)} 个）：")
+    for item in skipped:
+        print(f"  - {item['name']}：{item['why']}")
+    if deselected:
+        print(f"被 --skip 跳过、本次未校验的检查步骤（共 {len(deselected)} 个）：")
+        for item in deselected:
+            print(f"  - {item['name']}")
+    if failed:
+        print("失败的步骤：" + "、".join(str(r["name"]) for r in failed))
+        return 1
+    print("RESULT=OK")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

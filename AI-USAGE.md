@@ -37,6 +37,10 @@
 python scripts/automation/build_routing_index.py
 # 校验 4 处 Markdown 路由表与索引是否一致（有漂移则非零退出）
 python scripts/misc/check_routing_drift.py
+# 本地跑完 CI 定义的全部检查步骤：步骤列表从 .github/workflows/ci.yml 派生，不另抄一份。
+# Actions 在新建仓库里需要手动启用；没启用时，这一条命令就是唯一的执行面。
+python scripts/misc/run_ci_checks.py
+python scripts/misc/run_ci_checks.py --list
 # 人工查询某条需求的路由结果
 python scripts/automation/route_query.py "加密我的 python 脚本"
 # 知识库第二跳：把需求映射到具体 kb 文件（--verify 校验文件存在）

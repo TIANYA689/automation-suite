@@ -71,6 +71,13 @@ python scripts/misc/ai_finding.py validate     # 可复用发现库校验
 不在工作流里硬编码。
 
 CI 在 `windows-latest` 上执行以上检查，见 [`.github/workflows/ci.yml`](.github/workflows/ci.yml)。
+Actions 在新建仓库里**需要手动启用**（`Settings → Actions → General → Allow all actions`）。
+没启用时用本地等价入口——**步骤列表从 `ci.yml` 派生**，不另抄一份，两份判据不会漂移：
+
+```bash
+python scripts/misc/run_ci_checks.py         # 跑完 CI 定义的全部检查步骤
+python scripts/misc/run_ci_checks.py --list  # 只看派生出了哪些步骤、跳过了哪些
+```
 
 ## 文档地图
 
