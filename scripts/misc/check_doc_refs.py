@@ -12,6 +12,8 @@
 - `path_missing`   —— 反引号点名的仓库内路径不存在
 
 跳过与豁免都是显式常量并**全量打印**：可审计的排除不是漏洞。
+其中 `in_fence` 一项（代码围栏内整行不参与校验）按**行**计数，其余按引用计数——
+`check_commands.py` 反而**进**围栏，两者的取词范围**有意不同**，不是遗漏。
 
 零第三方依赖。
 
@@ -24,6 +26,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import unicodedata
 from pathlib import Path
@@ -52,8 +55,18 @@ SKIP_DIR_NAMES = {
     ".venv",
 }
 
-# 不参与校验的路径前缀：这些目录是本地产物，新克隆里本来就不存在。
-UNTRACKED_PREFIXES = ("cases/", "exports/", "reports/", "notes/", "tmp/")
+# 不参与校验的路径前缀：这些目录是本地产物（或被 gitignore），新克隆里本来就不存在。
+# `.workbuddy-ai/` 是代理本地记忆——`.gitignore` 与 `check_tool_inventory.py` 都已声明它
+# 不进仓库。**它曾经不在这张表里**：文档里写 `.workbuddy-ai/...` 会被判 `path_missing`，
+# 于是「本地绿、CI 红」（实测：2026-09-26，见 `test_dot_prefixed_local_dir_is_exempt`）。
+UNTRACKED_PREFIXES = (
+    "cases/",
+    "exports/",
+    "reports/",
+    "notes/",
+    "tmp/",
+    ".workbuddy-ai/",
+)
 
 PATH_SUFFIXES = (
     ".md",
@@ -73,6 +86,42 @@ PATH_SUFFIXES = (
     ".cfg",
 )
 
+# 只有后缀、没有名字（`.js`、`.py`）——是"这类文件"，不是某个文件。
+BARE_SUFFIX_ONLY_RE = re.compile(r"^\.[A-Za-z0-9]+$")
+
+# 裸文件名（无 `/`）的**显式豁免表**：按名字精确列，每条带理由，并**全量打印**。
+#
+# 为什么必须是表而不是启发式：`中视频.py`（读者自己的示例输入）与
+# `create-py-script.md`（**曾经真实存在的悬空引用**，见 F1）在**形状上完全一样**——
+# 都是"无斜杠 + 已知后缀"。区别只在语义，正则看不见语义。
+# 所以这里**不猜**：列出来；没列又解析不到的，就是 drift。
+# 代价是新增示例名时要补一行——这正是"**强制问题被回答**"，不是噪声。
+BARE_NAME_EXEMPTIONS: dict[str, str] = {
+    "中视频.py": "教程里的示例输入文件名（读者自己会有），不是本仓库文件",
+    "中视频.js": "教程里的示例输入文件名（读者自己会有），不是本仓库文件",
+    "ua_generator.py": "示例脚本名（读者自己写），不是本仓库文件",
+    "decrypt_tool.py": "示例工具名（读者自己写），不是本仓库文件",
+    "cordova.js": "第三方项目（Cordova）内部的文件，本仓库不拥有",
+    "decompile_failed.txt": "工具运行时的产出文件名，不是本仓库文件",
+    "exports.txt": "工具运行时的产出文件名，不是本仓库文件",
+    "imports.txt": "工具运行时的产出文件名，不是本仓库文件",
+    "strings.txt": "工具运行时的产出文件名，不是本仓库文件",
+}
+
+# 整篇在讲**上游仓库**文件的文档：其中的裸文件名指上游的文件，本仓库不拥有。
+#
+# 为什么按**文档**豁免，而不是按文件名列：
+#   - `ad-removal.md`（上游）与 `README.md`（本仓库）**形状完全一样**；
+#   - 而且**同一份文档里两种都可能出现**（这份台账既列上游切片，也点本仓库落点）。
+# 按文件名列会把本仓库的同名文件一起放过；按文档豁免保留的"文档级语境"
+# 是这里**唯一可判别**的信息。
+#
+# **代价（明确记下，别忘）**：这份文档里的裸文件名**不参与校验**。
+# 所以它只适用于"整篇在讲别的仓库"的台账，**不是通用逃生门**。
+# `test_check_doc_refs.py::UpstreamDocExemptionTests` 钉住这些路径真实存在——
+# 文档改名后豁免不会静默失效。
+UPSTREAM_REFERENCE_DOCS = {"docs/upstream-absorption.md"}
+
 EXEMPTIONS: tuple[tuple[str, str], ...] = (
     (
         "template",
@@ -84,15 +133,36 @@ EXEMPTIONS: tuple[tuple[str, str], ...] = (
     ),
     (
         "untracked_dir",
-        "`cases/`、`exports/`、`reports/`、`notes/`、`tmp/` 是本地产物目录，不在版本库里",
+        "`cases/`、`exports/`、`reports/`、`notes/`、`tmp/`、`.workbuddy-ai/` 是本地产物目录（或被 gitignore），不在版本库里",
     ),
     (
         "not_a_path",
-        "含空白（整条命令、含占位词的路径）或不含 `/` 的反引号内容（命令名、字段名、技能名），不是路径",
+        "含空白（整条命令、含占位词的路径），或不含 `/` 且不以已知后缀结尾的反引号内容（命令名、字段名、技能名），不是路径",
+    ),
+    (
+        "bare_suffix_only",
+        "只有后缀没有名字（`.js`、`.py`）——指的是**这类文件**，不是某个文件，无从校验存在性",
+    ),
+    (
+        "bare_example_name",
+        "裸文件名在 `BARE_NAME_EXEMPTIONS` 显式表里：读者自己的示例名 / 工具产出名 / 第三方项目文件，本仓库不拥有（**每条都有单独理由，全量打印**）",
+    ),
+    (
+        "inside_local_job",
+        "文档本身在 `projects/<作业>/` 里——作业目录是本地产物（真实抓包、真实域名），其中的文件名指向作业内文件，不进版本库",
+    ),
+    (
+        "upstream_reference_doc",
+        "文档整篇在讲**上游仓库**的文件（`UPSTREAM_REFERENCE_DOCS`）：其中的裸文件名指上游文件，本仓库不拥有。**代价：该文档的裸文件名不参与校验**",
     ),
     (
         "directory_ref",
         "不以已知文件后缀结尾的是目录引用；目录常按读者自己的工作目录书写（`data/`、`outputs/`），本仓库不拥有其存在性",
+    ),
+    (
+        "in_fence",
+        "``` 围栏内的**整行**不参与校验（**本项计数单位是行**，其余几项是引用数）："
+        "围栏里放的是示例、命令与片段，其中的路径属于读者环境，不是本仓库的引用",
     ),
 )
 
@@ -171,7 +241,12 @@ def _exempt(target: str) -> str | None:
         r"^[A-Za-z]:", target
     ):
         return "outside_repo"
-    normalised = target.replace("\\", "/").lstrip("./")
+    # 只摘掉一个前导 `./`。**不能用 `lstrip("./")`**：它会连同点目录名的那个点一起剥掉，
+    # `.workbuddy-ai/…` 变成 `workbuddy-ai/…`、`.github/…` 变成 `github/…`——
+    # 于是任何以点开头的目录都匹配不上 UNTRACKED_PREFIXES，豁免静默失效。
+    normalised = target.replace("\\", "/")
+    if normalised.startswith("./"):
+        normalised = normalised[2:]
     if normalised.startswith(UNTRACKED_PREFIXES):
         return "untracked_dir"
     return None
@@ -192,6 +267,57 @@ def _resolve(doc: Path, target: str) -> Path | None:
     return None
 
 
+_FILENAME_INDEX: dict[Path, dict[str, list[Path]]] = {}
+
+
+def _build_filename_index() -> dict[str, list[Path]]:
+    """文件名 → 路径们。用于解析**裸文件名**（无斜杠）。
+
+    按 ROOT 缓存：测试会把 ROOT 指到沙箱，各沙箱各建各的索引，不会串味。
+    遍历时剪掉 `SKIP_DIR_NAMES` 与 `tmp/`（`tmp/` 实测有几千个文件，
+    且全是本地产物，不该参与"仓库里有没有这个名字"的判断）。
+    """
+    index: dict[str, list[Path]] = {}
+    for current, dirs, files in os.walk(ROOT):
+        dirs[:] = [d for d in dirs if d not in SKIP_DIR_NAMES and d != "tmp"]
+        for name in files:
+            index.setdefault(name, []).append(Path(current) / name)
+    return index
+
+
+def _filename_index() -> dict[str, list[Path]]:
+    if ROOT not in _FILENAME_INDEX:
+        _FILENAME_INDEX[ROOT] = _build_filename_index()
+    return _FILENAME_INDEX[ROOT]
+
+
+def _inside_local_job(doc: Path) -> bool:
+    """文档是否在 `projects/<作业>/` 里（作业目录是本地产物）。"""
+    try:
+        parts = doc.relative_to(ROOT).parts
+    except ValueError:
+        return False
+    if len(parts) < 2 or parts[0] != "projects":
+        return False
+    return parts[1] not in {"README.md", "_template"}
+
+
+def _resolve_bare(doc: Path, name: str) -> Path | None:
+    """解析裸文件名：同目录优先，其次全仓按文件名找。
+
+    全仓有**多个同名**时返回第一个（保守放行）——"指的是哪一个"判不出来，
+    而规则 79 说**宁可漏，不可误报**。
+    """
+    same_dir = doc.parent / name
+    try:
+        if same_dir.is_file():
+            return same_dir
+    except OSError:
+        pass
+    hits = _filename_index().get(name, [])
+    return hits[0] if hits else None
+
+
 def _drift(file: Path, line: int, kind: str, detail: str) -> dict[str, object]:
     return {
         "file": file.relative_to(ROOT).as_posix(),
@@ -199,6 +325,37 @@ def _drift(file: Path, line: int, kind: str, detail: str) -> dict[str, object]:
         "kind": kind,
         "detail": detail,
     }
+
+
+def _check_bare_name(doc: Path, line: int, candidate: str) -> tuple[list[dict], str | None]:
+    """裸文件名（无 `/`）的判据。
+
+    F2：原先这里直接判 `not_a_path`，**整类豁免**——architect 里 5 处悬空的
+    `create-py-script.md` / `create-js-script.md` 正是从这条缝漏的（F1）。
+    现在的判据是：**能解析到就通过；解析不到就必须在显式表里**。
+    """
+    drifts: list[dict] = []
+    reason = _exempt(candidate)
+    if reason:
+        return drifts, reason
+    if BARE_SUFFIX_ONLY_RE.match(candidate):
+        return drifts, "bare_suffix_only"
+    if _inside_local_job(doc):
+        return drifts, "inside_local_job"
+    try:
+        relative_doc = doc.relative_to(ROOT).as_posix()
+    except ValueError:
+        relative_doc = ""
+    if relative_doc in UPSTREAM_REFERENCE_DOCS:
+        return drifts, "upstream_reference_doc"
+    if _resolve_bare(doc, candidate) is not None:
+        return drifts, None
+    if candidate in BARE_NAME_EXEMPTIONS:
+        return drifts, "bare_example_name"
+    drifts.append(
+        _drift(doc, line, "path_missing", f"点名的文件名在本仓库里找不到：{candidate}")
+    )
+    return drifts, None
 
 
 def _check_link(doc: Path, line: int, target: str) -> tuple[list[dict], str | None]:
@@ -227,10 +384,13 @@ def _check_backticked(doc: Path, line: int, body: str) -> tuple[list[dict], str 
     candidate = body.strip()
     if any(character.isspace() for character in candidate):
         return drifts, "not_a_path"
-    if "/" not in candidate.rstrip("/"):
-        return drifts, "not_a_path"
+    has_slash = "/" in candidate.rstrip("/")
     if not candidate.endswith(PATH_SUFFIXES):
-        return drifts, "directory_ref"
+        # 无已知后缀：有斜杠的当目录引用，没斜杠的当命令名/字段名/技能名。
+        return drifts, "directory_ref" if has_slash else "not_a_path"
+    if not has_slash:
+        # 裸文件名走单独判据（F2）：它可能是**真的引用**，也可能是示例名。
+        return _check_bare_name(doc, line, candidate)
     reason = _exempt(candidate)
     if reason:
         return drifts, reason
@@ -253,8 +413,16 @@ def run() -> dict[str, object]:
         in_fence = False
         for number, raw in enumerate(text.splitlines(), 1):
             if raw.strip().startswith("```"):
+                # 分隔行本身既不校验、也不计入"围栏内"——计数只数**夹在中间**的行，
+                # 这样 `in_fence` 的数字与读者理解的"围栏内有多少行"一致。
                 in_fence = not in_fence
+                continue
             if in_fence:
+                # 围栏内整行跳过——但**要计数**。原先这里是静默 `continue`，
+                # docstring 却写着"跳过与豁免都是显式常量并全量打印"，两句话对不上。
+                # 不进入围栏是有意的（围栏里是示例与命令，路径属于读者环境），
+                # 所以修法是把这次跳过**说出来**，而不是改成进围栏。
+                exempt_hits["in_fence"] += 1
                 continue
 
             for match in LINK_RE.finditer(raw):

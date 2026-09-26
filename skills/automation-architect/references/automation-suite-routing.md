@@ -13,6 +13,10 @@
 | Python 解密/脱壳 | python-script-decryptor | 静态解包、逐层 dump、报告 |
 | JS 源码保护 | js-script-obfuscator | javascript-obfuscator 风格保护 |
 | JS 解混淆 | js-script-deobfuscator | 字符串数组、RC4/Base64、控制流恢复 |
+| 无符号二进制的符号/结构体恢复 | binary-symbol-recovery | 调用图、字段偏移、算法常量指纹 |
+| 无设备条件下模拟执行片段 | emulated-execution-debug | 环境桩、调用约定、执行 trace |
+| APK/Android 授权样本分析 | apk-reverse-analysis | 结构审计、加固识别、原生层、归属判定；**只识别不绕过** |
+| 别人的脚本拆解与复用分档 | third-party-script-teardown | 结构盘点、能力矩阵、复用四档、对照重写；**只读，不执行目标脚本** |
 | 经验固化/跨技能知识路由 | knowledge-architect | 只在用户明确要求沉淀/固化/同步时触发 |
 
 ## 路由优先级
@@ -21,7 +25,9 @@
 2. 用户提供 HAR/curl/抓包 → 先做 API 证据分析，再开发脚本。
 3. 用户要求“加密/保护/混淆” → 按语言路由到 JS/Python obfuscator。
 4. 用户要求“解密/还原/解混淆/脱壳” → 按语言路由到 JS/Python decryptor/deobfuscator。
-5. 用户要求“把这次经验沉淀进技能/知识库/工作流” → 使用 `knowledge-architect` 形成提案；不把 knowledge-architect 合并进自动化叶子技能。
+5. 用户要求“分析别人的脚本/哪些值得复用/我会怎么写” → `third-party-script-teardown`；
+   代码不可读时先转对应解密技能，结论固化再转 `knowledge-architect`。
+6. 用户要求“把这次经验沉淀进技能/知识库/工作流” → 使用 `knowledge-architect` 形成提案；不把 knowledge-architect 合并进自动化叶子技能。
 
 ## 产物约定
 

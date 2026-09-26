@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+import atexit
 import contextlib
 import io
+import itertools
 import json
+import re
+import shutil
 import sys
 import tempfile
 import textwrap
@@ -36,10 +40,64 @@ class SlugTests(unittest.TestCase):
         self.assertEqual(slugify("P1.3 Health-Aware Pool"), "p13-health-aware-pool")
 
 
+# 整个模块共用一个沙箱：**热路径里没有 rmtree**。
+# 实测本机 rmtree 一个空目录要 ~400ms，25 个用例各建各的 TemporaryDirectory
+# 要跑 28.6 秒；改成共用一个沙箱后不到 1 秒（同 test_projects.py / test_validate_case_states.py）。
+_TMP_ROOT = Path(__file__).resolve().parents[3] / "tmp"
+_TMP_ROOT.mkdir(exist_ok=True)
+_SANDBOX = Path(tempfile.mkdtemp(dir=_TMP_ROOT, prefix="docrefs-test-"))
+_COUNTER = itertools.count()
+
+
+def _cleanup(target: Path) -> None:
+    """删不掉就留着，绝不把调用方带走（沙箱会拦 rmtree，那是预期）。"""
+    try:
+        shutil.rmtree(target, ignore_errors=True)
+    except SystemExit:
+        pass
+
+
+atexit.register(_cleanup, _SANDBOX)
+
+# 真实仓库根：从模块文件反推，**不受 `check_doc_refs.ROOT` 被测试猴补影响**。
+# 用于钉"豁免指向的文档真实存在"这类必须打在真仓库上的判据。
+_REAL_ROOT = Path(check_doc_refs.__file__).resolve().parents[2]
+
+
+class _SandboxCase(unittest.TestCase):
+    """一个用例一个沙箱子目录的基类。
+
+    把 `ROOT` 指向沙箱、清掉两个按 ROOT 缓存的索引（锚点表 + 文件名索引），
+    退出时恢复——`_FILENAME_INDEX` 按 ROOT 键控，不清会跨用例长大。
+    """
+
+    def setUp(self) -> None:
+        self.root = _SANDBOX / f"case-{next(_COUNTER)}"
+        self.root.mkdir(parents=True, exist_ok=True)
+        self._original = check_doc_refs.ROOT
+        check_doc_refs.ROOT = self.root
+        self._clear_caches()
+
+    def tearDown(self) -> None:
+        check_doc_refs.ROOT = self._original
+        self._clear_caches()
+
+    @staticmethod
+    def _clear_caches() -> None:
+        check_doc_refs._ANCHOR_CACHE.clear()
+        check_doc_refs._FILENAME_INDEX.clear()
+
+    def _write(self, relative: str, markdown: str) -> Path:
+        doc = self.root / relative
+        doc.parent.mkdir(parents=True, exist_ok=True)
+        doc.write_text(textwrap.dedent(markdown), encoding="utf-8", newline="\n")
+        self._clear_caches()
+        return doc
+
+
 class ReferenceDriftTests(unittest.TestCase):
     def setUp(self) -> None:
-        self._temp = tempfile.TemporaryDirectory()
-        self.root = Path(self._temp.name)
+        self.root = _SANDBOX / f"case-{next(_COUNTER)}"
         (self.root / "kb" / "demo" / "techniques").mkdir(parents=True)
         (self.root / "kb" / "demo" / "techniques" / "01-real.md").write_text(
             "# 真篇目\n\n## 小节标题\n", encoding="utf-8", newline="\n"
@@ -51,7 +109,6 @@ class ReferenceDriftTests(unittest.TestCase):
     def tearDown(self) -> None:
         check_doc_refs.ROOT = self._original
         check_doc_refs._ANCHOR_CACHE.clear()
-        self._temp.cleanup()
 
     def _run(self, markdown: str) -> dict:
         doc = self.root / "README.md"
@@ -109,6 +166,28 @@ class ReferenceDriftTests(unittest.TestCase):
         report = self._run("- [报告](reports/2026-01-01.md)\n")
         self.assertTrue(report["ok"], report["drifts"])
 
+    def test_dot_prefixed_local_dir_is_exempt(self) -> None:
+        """`.workbuddy-ai/` 是本地产物（被 gitignore），不能判 `path_missing`。
+
+        它**曾经**被判：`_exempt` 用 `lstrip("./")` 归一化，把点目录名的那个点一起剥掉，
+        `.workbuddy-ai/…` 变成 `workbuddy-ai/…`，匹配不上任何前缀。
+        后果是**本地绿、CI 红**——本机有这个目录，新克隆里没有。
+        """
+        report = self._run("见 `.workbuddy-ai/memory/MEMORY.md`。\n")
+        self.assertTrue(report["ok"], report["drifts"])
+        hits = {entry["reason"]: entry["hits"] for entry in report["exemptions"]}
+        self.assertEqual(hits["untracked_dir"], 1)
+
+    def test_dot_prefixed_name_without_the_dot_is_not_exempt(self) -> None:
+        """豁免表里是 `.workbuddy-ai/`，不是 `workbuddy-ai/`——点目录名的点不许被剥。"""
+        report = self._run("见 `workbuddy-ai/memory/MEMORY.md`。\n")
+        self.assertFalse(report["ok"])
+        self.assertEqual([d["kind"] for d in report["drifts"]], ["path_missing"])
+
+    def test_single_dot_slash_prefix_is_stripped(self) -> None:
+        report = self._run("见 `./reports/2026-01-01.md`。\n")
+        self.assertTrue(report["ok"], report["drifts"])
+
     def test_template_path_is_exempt(self) -> None:
         report = self._run("技能路径为 `skills/<name>/SKILL.md`。\n")
         self.assertTrue(report["ok"], report["drifts"])
@@ -126,6 +205,170 @@ class ReferenceDriftTests(unittest.TestCase):
         report = self._run("```bash\n# 见 kb/demo/techniques/99-ghost.md\n```\n")
         self.assertTrue(report["ok"], report["drifts"])
         self.assertEqual(report["paths_checked"], 0)
+
+    def test_fence_skip_is_counted_as_an_exemption(self) -> None:
+        """F3：围栏跳过原先**静默**，而 docstring 写着"豁免全量打印"——两句话对不上。
+
+        判据不是"它跳过了"（上面那条已证），而是"**这次跳过被报出来了**"。
+        """
+        report = self._run("```bash\n# 见 kb/demo/techniques/99-ghost.md\n```\n")
+        fence = [e for e in report["exemptions"] if e["reason"] == "in_fence"]
+        self.assertEqual(len(fence), 1, "in_fence 必须是显式豁免项之一")
+        self.assertEqual(fence[0]["hits"], 1, "围栏内跳过 1 行，计数应为 1")
+
+    def test_fence_skip_count_is_measured_not_constant(self) -> None:
+        """计数必须是真数出来的——写死成 1 的话上面那条就成了装饰。"""
+        report = self._run("```bash\nline1\nline2\nline3\n```\n")
+        fence = [e for e in report["exemptions"] if e["reason"] == "in_fence"][0]
+        self.assertEqual(fence["hits"], 3)
+
+    def test_entering_fences_would_report_them(self) -> None:
+        """证伪那条豁免**不是装饰**：关掉跳过，围栏里的坏引用就该报出来。
+
+        不进入围栏是有意的（围栏里是示例与命令，路径属于读者环境），
+        所以这里钉的是"这条豁免确实在挡东西"，而不是"它挡了什么具体内容"。
+        """
+        source = Path(check_doc_refs.__file__).read_text(encoding="utf-8")
+        patched, count = re.subn(
+            r"(\n\s*)if in_fence:", r"\1if in_fence and False:", source, count=1
+        )
+        self.assertEqual(count, 1, "找不到围栏跳过的那一行，判据会空转")
+        document = "```text\n见 `kb/demo/techniques/99-ghost.md` 一节。\n```\n"
+        doc = self.root / "README.md"
+        doc.write_text(document, encoding="utf-8", newline="\n")
+        check_doc_refs._ANCHOR_CACHE.clear()
+
+        # 沙箱内执行"进围栏"版本：ROOT 指向同一个沙箱
+        namespace = {"__name__": "patched", "__file__": str(Path(check_doc_refs.__file__))}
+        patched = patched.replace(
+            "ROOT = Path(__file__).resolve().parents[2]", f'ROOT = Path(r"{self.root}")'
+        )
+        exec(compile(patched, "patched", "exec"), namespace)
+        report = namespace["run"]()
+        kinds = {drift["kind"] for drift in report["drifts"]}
+        self.assertIn("path_missing", kinds, "关掉围栏豁免后，围栏内的坏引用应当被报出来")
+
+
+class BareFilenameTests(_SandboxCase):
+    """F2：裸文件名（无 `/`）原先被**整类**判成 `not_a_path` 放行。
+
+    漏的正是 F1——`create-py-script.md` / `create-js-script.md` 这类**悬空的真引用**，
+    它们"无斜杠 + 已知后缀"，形状与读者的示例名一模一样。
+    现在的判据：**能解析到就通过；解析不到就必须在显式表里**。
+    """
+
+    def test_resolvable_bare_name_passes(self) -> None:
+        self._write("kb/demo/note.md", "# 笔记\n")
+        self._write("README.md", "见 `note.md`。\n")
+        report = run()
+        self.assertTrue(report["ok"], report["drifts"])
+
+    def test_bare_filename_is_counted_as_checked(self) -> None:
+        """回归判据：裸名现在**真的进了校验**（此前整类豁免，不计数）。
+
+        带斜杠的与裸的都要计数——若裸名又退回 `not_a_path`，这里会掉成 1。
+        """
+        self._write("kb/demo/note.md", "# 笔记\n")
+        self._write("README.md", "见 `kb/demo/note.md` 与 `note.md`。\n")
+        report = run()
+        self.assertEqual(report["paths_checked"], 2)
+
+    def test_dangling_bare_name_is_reported(self) -> None:
+        """F1 类：悬空的裸文件名必须报 `path_missing`，不能靠形状放过。"""
+        self._write("README.md", "见 `create-py-script.md`。\n")
+        report = run()
+        self.assertFalse(report["ok"])
+        self.assertEqual(report["drifts"][0]["kind"], "path_missing")
+        self.assertIn("create-py-script.md", report["drifts"][0]["detail"])
+
+    def test_suffix_only_token_is_exempt(self) -> None:
+        """`.js` 指的是"这类文件"，不是某个文件——无从校验存在性。"""
+        self._write("README.md", "产物是 `.js` 或 `.py`。\n")
+        report = run()
+        self.assertTrue(report["ok"], report["drifts"])
+        reasons = {entry["reason"]: entry["hits"] for entry in report["exemptions"]}
+        self.assertEqual(reasons["bare_suffix_only"], 2)
+
+    def test_explicit_example_name_is_exempt(self) -> None:
+        """显式表里的示例名放行，且**理由被打印**（可审计的排除不是漏洞）。"""
+        self._write("README.md", "把你的输入命名为 `中视频.py`。\n")
+        report = run()
+        self.assertTrue(report["ok"], report["drifts"])
+        reasons = {entry["reason"]: entry["hits"] for entry in report["exemptions"]}
+        self.assertEqual(reasons["bare_example_name"], 1)
+
+    def test_exemption_table_is_consulted_not_a_blanket(self) -> None:
+        """证伪"裸名一律放行"：表外的悬空裸名照报，表内的才放行。
+
+        两条判据必须同时成立，否则表就成了摆设。
+        """
+        self._write("README.md", "`中视频.py` 放行，`ghost-nowhere.py` 不放行。\n")
+        report = run()
+        self.assertFalse(report["ok"])
+        self.assertEqual(len(report["drifts"]), 1)
+        self.assertIn("ghost-nowhere.py", report["drifts"][0]["detail"])
+
+    def test_doc_inside_local_job_is_exempt(self) -> None:
+        """`projects/<作业>/` 里的文档讲的是作业内文件，作业目录不进版本库。"""
+        self._write("projects/20260101-demo/job-notes.md", "产物是 `whatever-step.py`。\n")
+        report = run()
+        self.assertTrue(report["ok"], report["drifts"])
+        reasons = {entry["reason"]: entry["hits"] for entry in report["exemptions"]}
+        self.assertEqual(reasons["inside_local_job"], 1)
+
+    def test_job_readme_is_not_treated_as_a_local_job(self) -> None:
+        """`projects/README.md` 是**仓库文档**，不是作业内文档——豁免不能误伤它。"""
+        self._write("projects/README.md", "见 `ghost-index.py`。\n")
+        report = run()
+        self.assertFalse(report["ok"], "作业区 README 里的悬空裸名应当照报")
+        self.assertEqual(report["drifts"][0]["kind"], "path_missing")
+
+
+class UpstreamDocDeclarationTests(unittest.TestCase):
+    """`UPSTREAM_REFERENCE_DOCS` 是**文档级**豁免，代价最大，所以它自己必须被钉住。
+
+    这组判据打在**真仓库**上（用 `_REAL_ROOT` 而非模块 `ROOT`，避免被别的用例猴补影响）。
+    """
+
+    def test_declared_upstream_docs_exist(self) -> None:
+        self.assertTrue(check_doc_refs.UPSTREAM_REFERENCE_DOCS, "豁免表为空则判据空转")
+        for relative in sorted(check_doc_refs.UPSTREAM_REFERENCE_DOCS):
+            path = _REAL_ROOT / relative
+            self.assertTrue(
+                path.is_file(),
+                f"豁免指向的文档不存在了：{relative}——文档改名后豁免已静默失效",
+            )
+
+    def test_declared_upstream_doc_is_actually_scanned(self) -> None:
+        """豁免文档必须真的在扫描面里，否则这条豁免永远用不上（等于没有）。"""
+        original = check_doc_refs.ROOT
+        check_doc_refs.ROOT = _REAL_ROOT
+        try:
+            scanned = {
+                path.relative_to(_REAL_ROOT).as_posix() for path in check_doc_refs._iter_docs()
+            }
+        finally:
+            check_doc_refs.ROOT = original
+        for relative in sorted(check_doc_refs.UPSTREAM_REFERENCE_DOCS):
+            self.assertIn(relative, scanned, f"{relative} 不在扫描面里，豁免是空转的")
+
+
+class UpstreamDocExemptionTests(_SandboxCase):
+    """豁免是**文档级语境**：只对那几份文档生效，不是按文件名放开。"""
+
+    def test_bare_name_inside_upstream_doc_is_exempt(self) -> None:
+        self._write("docs/upstream-absorption.md", "上游切片 `ad-removal.md` 未吸收。\n")
+        report = run()
+        self.assertTrue(report["ok"], report["drifts"])
+        reasons = {entry["reason"]: entry["hits"] for entry in report["exemptions"]}
+        self.assertEqual(reasons["upstream_reference_doc"], 1)
+
+    def test_same_name_outside_upstream_doc_is_reported(self) -> None:
+        """对照：同一句放在别处文档里照报——否则豁免就是"按文件名"而不是"按语境"。"""
+        self._write("docs/other.md", "上游切片 `ad-removal.md` 未吸收。\n")
+        report = run()
+        self.assertFalse(report["ok"])
+        self.assertEqual(report["drifts"][0]["kind"], "path_missing")
 
 
 class ExemptionHygieneTests(unittest.TestCase):

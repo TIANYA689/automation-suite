@@ -35,27 +35,27 @@ description: "自动化开发架构师与套件路由器。负责需求分析、
 ```
 用户需求 ──→ 需求分析
                │
-               ├── 🤖 自动化脚本开发
+               ├── 🤖 自动化脚本开发（流程见本文件「自动化脚本开发流程」）
                │      ├── Python → automation-script-dev-py
-               │      │           Workflows: create-py-script.md
                │      ├── JavaScript → automation-script-dev-js
-               │      │               Workflows: create-js-script.md
                │      └── 选型不确定 → 见"技术选型决策树"
                │
                ├── 🔐 代码保护（加密/混淆）
                │      ├── Python 脚本 → python-obfuscator-pro
                │      └── JavaScript 脚本 → js-script-obfuscator
                │
-               ├── 🔓 代码分析（解密/解混淆）
-               │      ├── Python 加密脚本 → python-script-decryptor
-               │      ├── JS 混淆脚本 → js-script-deobfuscator
-               │      ├── 无符号二进制 → binary-symbol-recovery
-               │      ├── 需要跑通片段 → emulated-execution-debug
-               │      └── APK / Android 样本 → apk-reverse-analysis
-               │
-               └── 🎨 UI/UX 设计与开发
-                      └── 任何前端/界面需求 → ui-ux-pro-max
+               └── 🔓 代码分析（解密/解混淆）
+                      ├── Python 加密脚本 → python-script-decryptor
+                      ├── JS 混淆脚本 → js-script-deobfuscator
+                      ├── 无符号二进制 → binary-symbol-recovery
+                      ├── 需要跑通片段 → emulated-execution-debug
+                      ├── APK / Android 样本 → apk-reverse-analysis
+                      └── 别人的脚本 / 第三方脚本拆解 → third-party-script-teardown
 ```
+
+> **范围边界**：UI/UX 设计、前端界面开发**不在本套件范围**——本套件的技能只覆盖自动化脚本开发、
+> 自有代码保护、授权样本解密与逆向分析（见 `README.md` 的能力范围表）。这类需求请转通用 UI 技能，
+> 不要在本套件的技能表里路由。
 
 ---
 
@@ -72,8 +72,7 @@ description: "自动化开发架构师与套件路由器。负责需求分析、
 | **binary-symbol-recovery** | 符号恢复、结构体、反编译、无符号二进制 | 成对调用识别、算法常量指纹、结构体字段推断、置信度与证据 |
 | **emulated-execution-debug** | 模拟执行、unicorn、跨架构、跑通函数 | 原始字节加载、环境桩、回调驱动迭代调试、架构调用约定 |
 | **apk-reverse-analysis** | APK、加固、壳、dex、重打包、签名校验、归属判定 | 结构审计与改动审计、加固识别与边界度量、原生层与 JNI 形态、无 schema 解码、归属判定、脱敏与交付卫生 |
-| **ui-ux-pro-max** | UI设计、前端、网页、界面 | 50种风格、21套调色板、50字体对、8大技术栈 |
-| **skill-refactor** | 技能文件过长、SKILL.md精简、骨架化 | 700行阈值判断、代码骨架化、Pattern重编号、跨文件同步 |
+| **third-party-script-teardown** | 别人的脚本、第三方脚本、拆解、值得复用、我会怎么写 | 结构盘点与可读性分类、能力矩阵（带行号）、复用四档、对照重写差异表、知识回填候选 |
 
 ---
 
@@ -104,15 +103,6 @@ description: "自动化开发架构师与套件路由器。负责需求分析、
 | 长时间运行 | 定时器+状态机任务编排 |
 | 原始代码已是JS | 已有JS源码需要修改/解密 |
 
-### 选择 ui-ux-pro-max 的场景
-| 场景 | 示例 |
-|:---|:---|
-| 网页/界面设计 | Landing Page、Dashboard、Admin Panel |
-| 前端开发 | React/Vue/HTML/Tailwind 实现 |
-| UI/UX 优化 | 交互、动效、色彩方案、字体搭配 |
-| 组件设计 | Button、Modal、Navbar、Card、Table |
-| UI 风格 | Glassmorphism、暗黑模式、极简主义 |
-
 ### 选择解密/解混淆的场景
 | 场景 | 路由 |
 |:---|:---|
@@ -136,7 +126,7 @@ description: "自动化开发架构师与套件路由器。负责需求分析、
 - 简单签到脚本 → **Python**（语法简洁、生态丰富）
 - 涉及解密分析 → 看源代码语言（Python壳→decryptor、JS混淆→deobfuscator）
 - 用户没有偏好 → **Python**
-- 有UI/前端需求 → **ui-ux-pro-max**
+- 有 UI/前端需求 → **不在本套件范围**（本套件不做 UI/UX 与前端，见上文「范围边界」）
 
 ---
 
@@ -338,8 +328,8 @@ python scripts/misc/mcp_smoke_check.py               # MCP stdio 冒烟
 
 | 如果用户要... | 路由到 |
 |:---|:---|
-| 开发 Python 自动化脚本 | `automation-script-dev-py` + `create-py-script.md` |
-| 开发 JS 自动化脚本 | `automation-script-dev-js` + `create-js-script.md` |
+| 开发 Python 自动化脚本 | `automation-script-dev-py` |
+| 开发 JS 自动化脚本 | `automation-script-dev-js` |
 | 加密/混淆 Python 脚本 | `python-obfuscator-pro` |
 | 加密/混淆 JS 脚本 | `js-script-obfuscator` |
 | 解密/解混淆 Python 脚本 | `python-script-decryptor` |
@@ -347,13 +337,14 @@ python scripts/misc/mcp_smoke_check.py               # MCP stdio 冒烟
 | 恢复无符号二进制的符号或结构体 | `binary-symbol-recovery` |
 | 模拟执行一段机器码或算法片段 | `emulated-execution-debug` |
 | 分析 APK、识别加固、判定门禁归属 | `apk-reverse-analysis` |
-| 设计/开发 UI 界面/前端 | `ui-ux-pro-max` |
+| 分析别人的脚本、判定哪些值得复用、对照重写 | `third-party-script-teardown` |
+| 设计/开发 UI 界面/前端 | 不在本套件范围——转通用 UI 技能 |
 
 ### 自动化脚本开发流程
 0. **源码基线**: 若当前目录已有同类脚本，先阅读并分类可复用 pattern；压缩/混淆脚本只作为信号，不直接继承其表达。
 1. **Checklist（关键步骤）**: 自动填写已知项，展示“参数检查清单”并只确认缺口；完成语言技能的 Pattern 覆盖矩阵
 2. **技术选型**: 基于需求选择 Python / JavaScript
-3. **路由执行**: Python → `create-py-script.md`; JS → `create-js-script.md`
+3. **路由执行**: Python → 读 `skills/automation-script-dev-py/SKILL.md`；JS → 读 `skills/automation-script-dev-js/SKILL.md`
 4. **范式选择**: 在对应技能中选择合适的编程范式
 5. **文件归集**: 只要新增 README、示例配置、数据、日志等紧密相关文件，先创建/使用脚本同名文件夹并集中放置
 6. **实施**: 只实施矩阵中 `apply` 的 Pattern；复杂注册/凭证任务按需读取 Python 技能的 `skills/automation-script-dev-py/references/registration-automation-patterns.md`
@@ -364,6 +355,15 @@ python scripts/misc/mcp_smoke_check.py               # MCP stdio 冒烟
 2. 识别加密/混淆类型（见对应技能的 Identification 章节）
 3. 按对应技能的 Workflow 执行
 4. **解密完成后必须清理中间产物**（临时脚本、venv 等）
+
+### 第三方脚本拆解任务流程
+1. **先确认来源与授权范围**；来源不明或授权不明时先澄清，不用"只是看看"开工。
+2. 跑 `scripts/misc/script_teardown.py` 拿五张表（结构 / 能力 / 复用 / 缺口 / 风险），
+   **逐条回看命中行**——行号是唯一能被复核的证据。检测维度表在 `scripts/misc/teardown_rules.py`。
+3. 复用分档按 `skills/third-party-script-teardown/references/reuse-classification.md` 复核；
+   `refuse` 项必须写进报告，不能默默丢掉。
+4. 对照重写产出**差异表**（含 Pattern 依据），不产出重写版脚本。
+5. 知识候选交 `knowledge-architect`；产物落 `exports/third-party/` 与 `reports/third-party/`。
 
 ### 二进制分析任务流程
 1. 先静态后动态：`binary-symbol-recovery` 定名与还原结构，`emulated-execution-debug` 验证结论。

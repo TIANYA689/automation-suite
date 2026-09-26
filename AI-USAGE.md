@@ -16,6 +16,7 @@
 | 无符号二进制符号/结构体恢复 | `binary-symbol-recovery` | `exports/reversing/` |
 | 模拟执行单个函数或片段 | `emulated-execution-debug` | `exports/reversing/` |
 | APK / Android 授权样本分析、加固识别、归属判定 | `apk-reverse-analysis` | `exports/reversing/` |
+| 别人的脚本 / 第三方脚本拆解、复用分档、对照重写 | `third-party-script-teardown` | `exports/third-party/` + `reports/third-party/` |
 | 经验固化 / 知识漂移审查 | `knowledge-architect` | `kb/` 或技能 reference |
 | 外部模块文档检索 | `automation-architect` | `docs/automation-modules/` |
 
@@ -27,7 +28,7 @@
 
 | 层 | 载体 | 说明 |
 |---|---|---|
-| 单一事实源 | `routing.source.json` | 11 个技能的触发信号、角色、调用模式、模块分类与路由规则；**唯一需要手工维护的路由文件** |
+| 单一事实源 | `routing.source.json` | 12 个技能的触发信号、角色、调用模式、模块分类与路由规则；**唯一需要手工维护的路由文件** |
 | 派生索引 | `routing.index.json` | 由事实源 + 磁盘扫描生成，含 SKILL.md 的 hash、模块清单；派生产物，不提交 |
 | 路由 MCP | `scripts/automation/routing/mcp_server.py` | 6 个只读工具 `route_task` / `load_skill` / `list_skills` / `kb_route` / `list_modules` / `describe_module`，外加唯一的非只读工具 `run_module`（白名单 + dry-run 默认 + 审计日志） |
 
@@ -64,6 +65,14 @@ python scripts/automation/har_to_fixture.py capture.har --out fixture.har
 #   assert result.ok, result.output          # ok 看的是输出里的 [失败] 标记
 #   result.calls[0].files                    # 每次请求的实参都记得下来
 # 作业特有的用例数据随作业走（projects/<作业>/scripts/ 下的验证脚本）。
+# 第三方脚本拆解：只读盘点别人的脚本，产出结构清单 / 能力矩阵（带行号）/
+# 复用分档（直接复用 / 改造 / 只借鉴 / 拒绝吸收）/ 缺口 / 风险。**不执行目标文件。**
+# 检测维度与风险规则是数据，在 scripts/misc/teardown_rules.py；加维度只改那张表。
+# 散文区间（注释 / 文档字符串的识别与等长抹除）在 scripts/misc/text_spans.py。
+# 人读版的列宽与按显示宽度截断在 scripts/misc/teardown_render.py（`--ascii` 时退回 ASCII 框线）。
+python scripts/misc/script_teardown.py <目标目录> --json --out exports/third-party/teardown.json
+python scripts/misc/script_teardown.py <目标目录>            # 人读版（按显示宽度对齐）
+python scripts/misc/script_teardown.py <目标目录> --no-snippets
 # 抓包作业区：一次「抓包 → 脚本」作业一个目录 projects/<YYYYMMDD>-<slug>/
 python scripts/misc/new_project.py avalon-signin --goal "从抓包生成签到脚本"
 # 校验作业与索引是否一致；索引是派生产物，漂移时用 --rebuild-index 重建
