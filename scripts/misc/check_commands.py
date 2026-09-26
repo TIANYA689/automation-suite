@@ -15,6 +15,14 @@
 - `unknown_option`   —— 选项不在该（子）命令的 argparse 表里
 - `missing_value`    —— 选项需要值，但后面没有值（或紧跟另一个选项）
 
+**取词范围有两处，都是有意的**（F4）：
+
+1. **行首**命令（`python x.py ...` 顶格写）——一直如此。
+2. **行内**命令——只在**反引号代码跨度**里认（形如"见 `python x.py --json`"）。
+   判据是"作者把它标成了代码"，所以散文里顺口写的 `python x.py` **不算断言**、不受检
+   （这类残留会以 `prose_command` 计数并打印，见下）。
+3. **非 python 解释器**（`node` / `bash` / `pwsh`）**不检**——登记为已知不覆盖。
+
 豁免是显式常量并**全量打印**：可审计的排除不是漏洞，沉默的排除才是。
 
 零第三方依赖。
@@ -65,6 +73,24 @@ SKIP_DIR_NAMES = {
 
 COMMAND_RE = re.compile(r"^(?:\$|>|PS[^>]*>)?\s*(?:python3?|py)\s+(?P<rest>.+)$")
 
+# 行内命令（F4）：只在**反引号代码跨度**里认。
+# 判据是"作者把它标成了代码"——散文里顺口写的 `python x.py` 不是断言。
+CODE_SPAN_RE = re.compile(r"`(?P<body>[^`\n]+)`")
+# 跨度内容必须以解释器开头、且紧跟一个 `.py` 文件，才算命令。
+# 要求 `.py` 是承重的：没有它，`python 是一种语言` 这类散文也会被当成命令。
+INLINE_COMMAND_RE = re.compile(r"^(?:\$|>|PS[^>]*>)?\s*(?:python3?|py)\s+\S+\.py(?:\s|$)")
+# 同上，但不锚行首：用来**数**散文里裸写的命令（只计数，不校验）。
+PROSE_COMMAND_RE = re.compile(r"(?<![\w./\-])(?:python3?|py)\s+\S+\.py(?:\s|$)")
+
+# 行内命令里点名的**示例脚本**：读者自己写的文件名，不是本仓库文件。
+#
+# 与 `check_doc_refs.BARE_NAME_EXEMPTIONS` 同形，理由也一样：
+# `中视频.py`（读者示例）与一个真的改名了的脚本**形状完全一样**（无斜杠 + `.py`），
+# 正则看不见语义，所以这里**列表不猜**。实测只有这一条。
+EXAMPLE_SCRIPTS: dict[str, str] = {
+    "中视频.py": "教程里的示例输入文件名（读者自己会有），不是本仓库文件",
+}
+
 # 无需值的 argparse action。其余 action 默认需要一个值。
 VALUELESS_ACTIONS = {
     "store_true",
@@ -93,6 +119,16 @@ EXEMPTIONS: tuple[tuple[str, str], ...] = (
     (
         "unparsable",
         "引号不闭合等无法分词的行；强行分词只会产出假 drift",
+    ),
+    (
+        "example_script",
+        "行内命令点名的是 `EXAMPLE_SCRIPTS` 显式表里的**示例脚本名**（读者自己写），本仓库不拥有",
+    ),
+    (
+        "prose_command",
+        "**散文里**（不在反引号代码跨度内）顺口提到的 `python x.py`：作者没把它标成代码，"
+        "就不算一条断言。**代价：这类写法不受检**——本项按行计数，数字涨了就说明文档里"
+        "裸写的命令变多了，该把它们放进反引号",
     ),
 )
 
@@ -408,6 +444,32 @@ def _check_command(
     return drifts
 
 
+def _examine(doc: Path, line: int, command: str) -> tuple[list[dict], str | None, str | None]:
+    """校验**一条**命令行。
+
+    返回 `(drifts, 计入校验的脚本名, 豁免理由)`——后两者互斥，都可能是 None。
+    拆出来是为了让行首命令与行内命令走**同一条**判据（F4）：两条路各写一份的话，
+    `_placeholder_reason` / `EXAMPLE_SCRIPTS` 迟早只在一处生效。
+    """
+    match = COMMAND_RE.match(command)
+    if not match:
+        return [], None, None
+    rest = match.group("rest").strip()
+    if rest.startswith("-"):
+        return [], None, "interpreter -m"
+    reason = _placeholder_reason(rest)
+    if reason is not None:
+        return [], None, reason
+    tokens = _tokenize(command)
+    if tokens is None or len(tokens) < 2:
+        return [], None, "unparsable"
+    if not tokens[1].endswith(".py"):
+        return [], None, "interpreter -m"
+    if Path(tokens[1]).name in EXAMPLE_SCRIPTS:
+        return [], None, "example_script"
+    return _check_command(doc, line, tokens), tokens[1], None
+
+
 def run() -> dict[str, object]:
     drifts: list[dict[str, object]] = []
     exempt_hits: dict[str, int] = {reason: 0 for reason, _ in EXEMPTIONS}
@@ -421,27 +483,34 @@ def run() -> dict[str, object]:
             continue
         for line_number, logical in _logical_lines(text):
             command = _normalise_separators(_strip_comment(logical).strip())
-            match = COMMAND_RE.match(command)
-            if not match:
-                continue
-            rest = match.group("rest").strip()
-            if rest.startswith("-"):
-                exempt_hits["interpreter -m"] += 1
-                continue
-            reason = _placeholder_reason(rest)
-            if reason is not None:
+
+            # ① 行首命令
+            found, script, reason = _examine(doc, line_number, command)
+            if reason:
                 exempt_hits[reason] += 1
-                continue
-            tokens = _tokenize(command)
-            if tokens is None or len(tokens) < 2:
-                exempt_hits["unparsable"] += 1
-                continue
-            if not tokens[1].endswith(".py"):
-                exempt_hits["interpreter -m"] += 1
-                continue
-            checked += 1
-            scripts_seen.add(tokens[1])
-            drifts.extend(_check_command(doc, line_number, tokens))
+            if script:
+                checked += 1
+                scripts_seen.add(script)
+            drifts.extend(found)
+
+            # ② 行内命令：只认反引号代码跨度里的（F4）
+            for span in CODE_SPAN_RE.finditer(command):
+                body = _normalise_separators(span.group("body").strip())
+                if not INLINE_COMMAND_RE.match(body):
+                    continue
+                found, script, reason = _examine(doc, line_number, body)
+                if reason:
+                    exempt_hits[reason] += 1
+                if script:
+                    checked += 1
+                    scripts_seen.add(script)
+                drifts.extend(found)
+
+            # ③ 计数残留：散文里裸写的命令。**只计数、不校验**——但要说出来，
+            #    否则"没报 drift"与"根本没看"在输出上长得一样（规则 10）。
+            if not COMMAND_RE.match(command) and PROSE_COMMAND_RE.search(command):
+                if not any(INLINE_COMMAND_RE.match(s.group("body").strip()) for s in CODE_SPAN_RE.finditer(command)):
+                    exempt_hits["prose_command"] += 1
 
     return {
         "ok": not drifts,

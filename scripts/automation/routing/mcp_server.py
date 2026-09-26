@@ -53,7 +53,27 @@ except ImportError:
     EXECUTES = None
 
 SERVER_NAME = "automation_suite_router"
-mcp = _Server(SERVER_NAME, version="1.0.0")
+
+
+def _build_server():
+    """构造 SDK 服务器对象，兼容两代 SDK 的构造签名。
+
+    2.x 的 `MCPServer` 接受 `version=`；1.x 的 `FastMCP` **不接受**——传了会
+    `TypeError: unexpected keyword argument 'version'`。这里先试带 `version`，
+    失败再退回不带。
+
+    两个分支都有实测支撑（`mcp_smoke_check.py --require-mcp`）：
+    mcp 2.2.0 走前者，mcp 1.28.1 走后者；两处 serverInfo.name 都是
+    `automation_suite_router`。不写这个兜底，`requirements.txt` 里
+    `mcp>=1.2.0` 就是在声明一份并不成立的 1.x 兼容。
+    """
+    try:
+        return _Server(SERVER_NAME, version="1.0.0")
+    except TypeError:
+        return _Server(SERVER_NAME)
+
+
+mcp = _build_server()
 
 _cache: dict[str, Any] = {"root": None, "index": None, "stamp": None}
 

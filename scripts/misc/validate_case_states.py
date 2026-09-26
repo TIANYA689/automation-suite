@@ -15,6 +15,7 @@
 
 from __future__ import annotations
 
+import argparse
 import json
 from datetime import date
 from pathlib import Path
@@ -124,25 +125,64 @@ def validate_manifest(path: Path) -> list[str]:
     return errors
 
 
-def main() -> int:
-    state_files = sorted(CASES_ROOT.glob("*/state.json"))
-    manifest_files = sorted(CASES_ROOT.glob("*/ai_manifest.json"))
-    if TEMPLATE_ROOT.is_dir():
-        state_files += sorted(TEMPLATE_ROOT.glob("state.json"))
-        manifest_files += sorted(TEMPLATE_ROOT.glob("ai_manifest.json"))
+def collect() -> tuple[list[Path], list[Path], dict[str, int]]:
+    """返回 (state 文件, manifest 文件, 覆盖度)。
+
+    覆盖度把 `cases/` 与 `templates/` **分开报**。`cases/` 被 `.gitignore` 挡住，
+    新克隆里它一个文件都没有——那种情况下「通过」只说明模板没问题。
+    不分开报，这个差别在退出码上看不见（两种情形都是 exit=0）。
+    """
+    case_states = sorted(CASES_ROOT.glob("*/state.json"))
+    case_manifests = sorted(CASES_ROOT.glob("*/ai_manifest.json"))
+    template_states = sorted(TEMPLATE_ROOT.glob("state.json")) if TEMPLATE_ROOT.is_dir() else []
+    template_manifests = sorted(TEMPLATE_ROOT.glob("ai_manifest.json")) if TEMPLATE_ROOT.is_dir() else []
+    coverage = {
+        "case_items": len(case_states) + len(case_manifests),
+        "template_items": len(template_states) + len(template_manifests),
+    }
+    return case_states + template_states, case_manifests + template_manifests, coverage
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="校验长任务案例状态。")
+    parser.add_argument(
+        "--expect-cases",
+        type=int,
+        default=None,
+        metavar="N",
+        help="cases/ 下的校验项数量必须是 N（默认不检查）。CI 上显式传 0："
+        "cases/ 被 .gitignore 挡住，新克隆里只有 templates/case/ 会被校验。"
+        "把「空集」写成断言，将来若有人把 cases/ 纳入版本库，CI 会红，"
+        "而不是悄悄改变这条门禁的含义。",
+    )
+    args = parser.parse_args(argv)
+
+    state_files, manifest_files, coverage = collect()
 
     errors = [error for path in state_files for error in validate_state(path)]
     errors += [error for path in manifest_files for error in validate_manifest(path)]
+
+    if args.expect_cases is not None and coverage["case_items"] != args.expect_cases:
+        errors.append(
+            f"cases/ 下的校验项应为 {args.expect_cases} 个，实际 {coverage['case_items']} 个"
+            "——若这是有意改动（例如把 cases/ 纳入版本库），请同步更新 CI 的 --expect-cases"
+        )
 
     result = {
         "ok": not errors,
         "state_count": len(state_files),
         "manifest_count": len(manifest_files),
+        "coverage": coverage,
         "valid_statuses": sorted(VALID_STATUSES),
         "valid_manifest_statuses": sorted(VALID_MANIFEST_STATUSES),
         "errors": errors,
     }
     print(json.dumps(result, ensure_ascii=False, indent=2))
+    if not coverage["case_items"]:
+        print(
+            "NOTE: cases/ 下没有可校验项（新克隆的常态，该目录被 .gitignore 挡住）——"
+            f"本次只校验了 templates/case/ 的 {coverage['template_items']} 项。"
+        )
     return 0 if not errors else 1
 
 

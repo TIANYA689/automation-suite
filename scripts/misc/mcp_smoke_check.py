@@ -2,11 +2,16 @@
 """路由 MCP 服务器冒烟检查。
 
 真实走一遍 MCP stdio 协议：initialize -> tools/list -> 各工具调一次。
-未安装 mcp 时优雅跳过（退出码 0），便于在无依赖环境跑。
+未安装 mcp 时默认优雅跳过（退出码 0），便于在无依赖环境跑。
+
+但"跳过"与"通过"退出码相同，是一处看不见的失效：CI 装了 mcp 却因故没生效时，
+这条门禁会从"真跑"悄悄退回"永远跳过"，而 CI 依然全绿。所以在**必须有 mcp** 的
+场合（CI）传 `--require-mcp`，把"缺依赖"从跳过改成失败。
 
 用法：
     python scripts/misc/mcp_smoke_check.py
     python scripts/misc/mcp_smoke_check.py --python <解释器路径>
+    python scripts/misc/mcp_smoke_check.py --require-mcp   # CI：缺 mcp 即失败
 """
 
 from __future__ import annotations
@@ -56,14 +61,25 @@ def _call(proc: subprocess.Popen, call_id: int, name: str, arguments: dict) -> d
     return json.loads(result["content"][0]["text"])
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="路由 MCP 服务器冒烟检查")
     parser.add_argument("--python", default=sys.executable, help="运行服务器的解释器（需已安装 mcp）")
-    args = parser.parse_args()
+    parser.add_argument(
+        "--require-mcp",
+        action="store_true",
+        help="缺 mcp 时失败而非跳过。CI 用这个开关，避免"
+        "「依赖装失败 → 门禁静默跳过 → CI 仍绿」这条退化路径。",
+    )
+    args = parser.parse_args(argv)
 
     probe = subprocess.run([args.python, "-c", "import mcp"], capture_output=True, text=True, check=False)
     if probe.returncode != 0:
-        print(f"跳过：{args.python} 未安装 mcp（pip install -r scripts/automation/routing/requirements.txt）")
+        install_hint = "pip install -r scripts/automation/routing/requirements.txt"
+        if args.require_mcp:
+            print(f"失败：{args.python} 未安装 mcp，但已要求必须运行（{install_hint}）")
+            print(probe.stderr.strip())
+            return 1
+        print(f"跳过：{args.python} 未安装 mcp（{install_hint}）")
         return 0
 
     proc = subprocess.Popen(
@@ -76,6 +92,7 @@ def main() -> int:
         cwd=str(ROOT),
     )
     failures: list[str] = []
+    server_stderr = ""
     try:
         _send(proc, {"jsonrpc": "2.0", "id": 1, "method": "initialize",
                      "params": {"protocolVersion": "2025-06-18", "capabilities": {},
@@ -149,14 +166,28 @@ def main() -> int:
             failures.append("默认应拒绝执行，却已执行")
         if "白名单" not in guard.get("reason", ""):
             failures.append(f"拒绝原因未说明白名单：{guard.get('reason')}")
+    except (RuntimeError, json.JSONDecodeError, KeyError, IndexError) as exc:
+        # 服务器中途死掉时，裸异常是「服务器提前关闭」，看不出为什么——
+        # 而这正是这条门禁最需要说清楚的一种失败（SDK 版本不兼容就在这一类）。
+        # 收成一条失败项，并连同 stderr 一起打印（见下）。
+        failures.append(f"协议交互中断：{type(exc).__name__}: {exc}")
     finally:
         proc.terminate()
         try:
             proc.wait(timeout=5)
         except subprocess.TimeoutExpired:
             proc.kill()
+            proc.wait(timeout=5)
+        server_stderr = proc.stderr.read() if proc.stderr else ""
+        # 关掉管道，否则解释器退出时会报 ResourceWarning（测试里尤其显眼）。
+        for stream in (proc.stdin, proc.stdout, proc.stderr):
+            if stream is not None:
+                stream.close()
 
     if failures:
+        if server_stderr.strip():
+            print("\n服务器 stderr（失败根因通常在这里）：")
+            print(server_stderr.strip())
         print("\n失败项：")
         for item in failures:
             print(" -", item)

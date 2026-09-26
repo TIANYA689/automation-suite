@@ -29,8 +29,11 @@ jobs:
       - name: Public release check
         run: python scripts/misc/public_release_check.py
 
+      # cases/ 被 .gitignore 挡住，新克隆里它一个文件都没有，本次只会校验 templates/case/。
+      # --expect-cases 0 把「空集」写成断言：将来若有人把 cases/ 纳入版本库，CI 会红，
+      # 而不是让这条门禁的含义悄悄改变。
       - name: Case state validation
-        run: python scripts/misc/validate_case_states.py
+        run: python scripts/misc/validate_case_states.py --expect-cases 0
 
       # 作业区索引是派生产物，与各作业的 job.json 必须一致。
       - name: Project workspace check
@@ -74,6 +77,11 @@ jobs:
       - name: Offline unit tests
         run: python scripts/misc/run_offline_tests.py --strict
 
-      # 无 mcp 时该脚本自行跳过，不构成门禁。
+      # 路由 MCP 服务器依赖（仅 mcp_server.py 需要）。装不上就直接红，
+      # 否则冒烟检查会退回「未安装 → 跳过 → CI 仍绿」的静默退化。
+      - name: Install routing MCP dependencies
+        run: python -m pip install -r scripts/automation/routing/requirements.txt
+
+      # 真实走一遍 MCP stdio 协议。--require-mcp 让「缺依赖」变成失败而非跳过。
       - name: MCP stdio smoke check
-        run: python scripts/misc/mcp_smoke_check.py
+        run: python scripts/misc/mcp_smoke_check.py --require-mcp

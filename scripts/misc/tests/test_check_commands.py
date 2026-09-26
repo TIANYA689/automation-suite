@@ -6,9 +6,12 @@
 
 from __future__ import annotations
 
+import atexit
 import contextlib
 import io
+import itertools
 import json
+import shutil
 import sys
 import tempfile
 import textwrap
@@ -36,12 +39,31 @@ sub.add_parser("validate")
 '''
 
 
+# 整个模块共用一个沙箱：**热路径里没有 rmtree**。
+# 实测本机 rmtree 一个空目录要 ~400ms；39 个用例各建各的 `TemporaryDirectory`
+# 要跑 **31.3 秒**，改成共用一个沙箱后 **< 0.3 秒**（规则 36 的第四次落地）。
+_TMP_ROOT = Path(__file__).resolve().parents[3] / "tmp"
+_TMP_ROOT.mkdir(exist_ok=True)
+_SANDBOX = Path(tempfile.mkdtemp(dir=_TMP_ROOT, prefix="cmdtest-"))
+_COUNTER = itertools.count()
+
+
+def _cleanup(target: Path) -> None:
+    """删不掉就留着，绝不把调用方带走（沙箱拦 rmtree 是预期）。"""
+    try:
+        shutil.rmtree(target, ignore_errors=True)
+    except SystemExit:
+        pass
+
+
+atexit.register(_cleanup, _SANDBOX)
+
+
 class CliExtractionTests(unittest.TestCase):
     def _spec(self):
-        with tempfile.TemporaryDirectory() as raw:
-            script = Path(raw) / "sample.py"
-            script.write_text(textwrap.dedent(SAMPLE_SCRIPT), encoding="utf-8", newline="\n")
-            return extract_cli(script)
+        script = _SANDBOX / f"spec-{next(_COUNTER)}.py"
+        script.write_text(textwrap.dedent(SAMPLE_SCRIPT), encoding="utf-8", newline="\n")
+        return extract_cli(script)
 
     def test_reads_top_level_options(self) -> None:
         spec = self._spec()
@@ -64,19 +86,22 @@ class CliExtractionTests(unittest.TestCase):
         self.assertIn("validate", spec.subcommands)
 
     def test_unparsable_script_returns_none(self) -> None:
-        with tempfile.TemporaryDirectory() as raw:
-            script = Path(raw) / "broken.py"
-            script.write_text("def (:\n", encoding="utf-8", newline="\n")
-            self.assertIsNone(extract_cli(script))
+        script = _SANDBOX / f"broken-{next(_COUNTER)}.py"
+        script.write_text("def (:\n", encoding="utf-8", newline="\n")
+        self.assertIsNone(extract_cli(script))
 
 
-class DriftDetectionTests(unittest.TestCase):
-    """每条判据都要有能触发它的用例。"""
+class _ToolCase(unittest.TestCase):
+    """`DriftDetectionTests` / `InlineCommandTests` 共用的夹具。
 
+    **模块共用一个沙箱**，每个用例一个子目录：热路径里没有 rmtree。
+    实测改之前这两个类各建各的 `TemporaryDirectory`，**39 例跑 31.3 秒**；
+    改成共用沙箱后 **< 0.3 秒**（同 `test_check_doc_refs.py` / `test_validate_case_states.py`，
+    规则 36 的第四次落地）。
+    """
     def setUp(self) -> None:
-        self._temp = tempfile.TemporaryDirectory()
-        self.root = Path(self._temp.name)
-        (self.root / "scripts").mkdir()
+        self.root = _SANDBOX / f"case-{next(_COUNTER)}"
+        (self.root / "scripts").mkdir(parents=True)
         (self.root / "scripts" / "tool.py").write_text(
             textwrap.dedent(SAMPLE_SCRIPT), encoding="utf-8", newline="\n"
         )
@@ -85,12 +110,16 @@ class DriftDetectionTests(unittest.TestCase):
 
     def tearDown(self) -> None:
         check_commands.ROOT = self._original_root
-        self._temp.cleanup()
 
     def _run(self, markdown: str) -> dict:
-        doc = self.root / "README.md"
-        doc.write_text(textwrap.dedent(markdown), encoding="utf-8", newline="\n")
+        (self.root / "README.md").write_text(
+            textwrap.dedent(markdown), encoding="utf-8", newline="\n"
+        )
         return run()
+
+
+class DriftDetectionTests(_ToolCase):
+    """每条判据都要有能触发它的用例。"""
 
     def test_valid_command_passes(self) -> None:
         report = self._run(
@@ -217,6 +246,85 @@ class DriftDetectionTests(unittest.TestCase):
         drift = report["drifts"][0]
         self.assertEqual(drift["file"], "README.md")
         self.assertEqual(drift["line"], 4)
+
+
+class InlineCommandTests(_ToolCase):
+    """F4：取词范围从「行首」扩到「反引号代码跨度里」。
+
+    判据是**作者有没有把它标成代码**——标了就算断言，没标就不算。
+    扩这一层之前，`README.md:70` 的 `--print-requirements` 这类写法**完全不受检**。
+    """
+
+    def _hits(self, report: dict, reason: str) -> int:
+        return next(e["hits"] for e in report["exemptions"] if e["reason"] == reason)
+
+    def test_inline_command_is_checked(self) -> None:
+        """扩层的**主判据**：跨度里的坏选项要被抓到。"""
+        report = self._run("见 `python scripts/tool.py add --nope` 一节。\n")
+        self.assertFalse(report["ok"], "行内命令没有被校验")
+        self.assertEqual(report["drifts"][0]["kind"], "unknown_option")
+
+    def test_inline_command_with_a_missing_script_is_detected(self) -> None:
+        report = self._run("用 `python scripts/ghost.py` 跑。\n")
+        self.assertFalse(report["ok"])
+        self.assertEqual(report["drifts"][0]["kind"], "script_missing")
+
+    def test_inline_command_is_counted(self) -> None:
+        report = self._run("见 `python scripts/tool.py add --title x` 一节。\n")
+        self.assertTrue(report["ok"], report["drifts"])
+        self.assertEqual(report["checked_commands"], 1)
+
+    def test_prose_command_is_counted_but_not_checked(self) -> None:
+        """散文里裸写的命令**只计数、不校验**——但必须被数出来。
+
+        否则"没报 drift"与"根本没看"在输出上长得一样（规则 10）。
+        """
+        report = self._run("跑 python scripts/ghost.py 即可。\n")
+        self.assertTrue(report["ok"], "散文里的裸命令不该产生 drift")
+        self.assertEqual(report["checked_commands"], 0)
+        self.assertEqual(self._hits(report, "prose_command"), 1)
+
+    def test_prose_count_is_measured_not_constant(self) -> None:
+        report = self._run(
+            "跑 python scripts/a.py 即可。\n另外 python scripts/b.py 也行。\n"
+        )
+        self.assertEqual(self._hits(report, "prose_command"), 2)
+
+    def test_prose_line_containing_a_code_span_is_not_counted_as_prose(self) -> None:
+        """一行里既有散文又有代码跨度时，别把同一件事数两遍。"""
+        report = self._run("跑 `python scripts/tool.py add --title x` 即可。\n")
+        self.assertEqual(self._hits(report, "prose_command"), 0)
+        self.assertEqual(report["checked_commands"], 1)
+
+    def test_inline_requires_a_py_token(self) -> None:
+        """`python 是一种语言` 不是命令——要求 `.py` 是承重的。"""
+        report = self._run("`python 是一种语言`，`python3` 也一样。\n")
+        self.assertEqual(report["checked_commands"], 0)
+        self.assertEqual(self._hits(report, "prose_command"), 0)
+        self.assertTrue(report["ok"], report["drifts"])
+
+    def test_placeholder_inline_is_exempt(self) -> None:
+        report = self._run('见 `python scripts/tool.py add --title "<TITLE>"` 一节。\n')
+        self.assertTrue(report["ok"], report["drifts"])
+        self.assertGreaterEqual(self._hits(report, "placeholder"), 1)
+
+    def test_example_script_is_exempt(self) -> None:
+        """`EXAMPLE_SCRIPTS` 里的示例名放行（读者自己写的文件）。"""
+        report = self._run("把你的输入命名为 `python .\\中视频.py` 即可。\n")
+        self.assertTrue(report["ok"], report["drifts"])
+        self.assertEqual(self._hits(report, "example_script"), 1)
+
+    def test_example_table_is_consulted_not_a_blanket(self) -> None:
+        """证伪"带 `.py` 的一律放行"：表外的照报。"""
+        report = self._run("见 `python scripts/ghost-nowhere.py` 一节。\n")
+        self.assertFalse(report["ok"], "表外的脚本名不该被放过")
+        self.assertEqual(report["drifts"][0]["kind"], "script_missing")
+
+    def test_line_start_path_is_unchanged(self) -> None:
+        """回归：扩层不能把行首那条路改坏（两条路共用 `_examine`）。"""
+        report = self._run("```bash\npython scripts/tool.py add --title hello\n```\n")
+        self.assertTrue(report["ok"], report["drifts"])
+        self.assertEqual(report["checked_commands"], 1)
 
 
 class ExemptionHygieneTests(unittest.TestCase):

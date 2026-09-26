@@ -1,19 +1,67 @@
 from __future__ import annotations
 
+import atexit
+import contextlib
+import io
+import itertools
+import json
 import re
+import shutil
 import subprocess
+import sys
+import tempfile
 import unittest
 from pathlib import Path
 
-from public_release_check import (
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+import public_release_check  # noqa: E402
+from public_release_check import (  # noqa: E402
+    ID_CHECK_CODES,
+    ID_WEIGHTS,
+    MIN_SCANNED_FILES,
     REQUIRED_FILES,
     _git_listed_files,
+    _is_synthetic_path,
     find_pii,
     find_private_config,
     iter_candidate_files,
 )
 
 ROOT = Path(__file__).resolve().parents[3]
+
+# 模块共用一个沙箱：热路径里没有 rmtree（规则 36）。
+_TMP_ROOT = Path(__file__).resolve().parents[3] / "tmp"
+_TMP_ROOT.mkdir(exist_ok=True)
+_SANDBOX = Path(tempfile.mkdtemp(dir=_TMP_ROOT, prefix="pubrel-test-"))
+_COUNTER = itertools.count()
+
+
+def _cleanup(target: Path) -> None:
+    try:
+        shutil.rmtree(target, ignore_errors=True)
+    except SystemExit:
+        pass
+
+
+atexit.register(_cleanup, _SANDBOX)
+
+
+def _valid_id(body17: str) -> str:
+    """按 GB 11643 的 mod-11-2 算出校验位，拼一个**合法**身份证号。"""
+    total = sum(int(c) * w for c, w in zip(body17, ID_WEIGHTS))
+    return body17 + ID_CHECK_CODES[total % 11]
+
+
+def _path_hits(text: str) -> list[tuple[str, str]]:
+    """复刻 `main()` 的路径判据（含合成标记过滤）。"""
+    hits = []
+    for name, rx in public_release_check.PATH_PATTERNS:
+        for match in rx.finditer(text):
+            if not _is_synthetic_path(match.group(0)):
+                hits.append((name, match.group(0)))
+    return hits
+
 
 
 class PrivateConfigDetectionTests(unittest.TestCase):
@@ -112,6 +160,154 @@ class PiiEmailDetectionTests(unittest.TestCase):
             with self.subTest(path=relative):
                 source = (ROOT / relative).read_text(encoding="utf-8")
                 self.assertEqual(find_pii(source), [])
+
+    def test_own_sources_have_no_path_hits(self) -> None:
+        """F8 的同一句话：**新加的路径规则第一条命中的是它自己的定义行**。
+
+        实测首版 5 条自命中：两条是 `/Users/` / `/home/` 的**字面量**（前向斜杠没法
+        像反斜杠那样转义，得写成 `[U]sers` / `[h]ome`），三条是**注释里为了解释规则
+        而照抄的路径**（规则 30 的原话：描述这些正则时不要照抄字面量）。
+        这条判据把两边都钉住。
+        """
+        for relative in (
+            "scripts/misc/public_release_check.py",
+            "scripts/misc/tests/test_public_release_check.py",
+        ):
+            with self.subTest(path=relative):
+                source = (ROOT / relative).read_text(encoding="utf-8")
+                self.assertEqual(_path_hits(source), [])
+
+
+class PiiPhoneDetectionTests(unittest.TestCase):
+    """F7：手机号规则。**必须带占位识别**——实测本仓 5 处命中全是占位号。
+
+    正例字面量一律拼出来：本文件自己也在扫描范围内（同上面邮箱那组的手法）。
+    """
+
+    def test_flags_a_person_like_number(self) -> None:
+        hits = find_pii("联系人 138" + "12345678 收")
+        self.assertEqual(len(hits), 1)
+        self.assertEqual(hits[0][2], "pii_phone")
+
+    def test_allows_documented_placeholder_numbers(self) -> None:
+        text = "\n".join(["138" + "00000000", "138" + "00138000", "188" + "88888888"])
+        self.assertEqual(find_pii(text), [])
+
+    def test_allows_all_same_digits(self) -> None:
+        self.assertEqual(find_pii("111" + "11111111"), [])
+
+    def test_a_longer_digit_run_is_not_a_phone(self) -> None:
+        """13 位数字串里嵌着 11 位手机号，那是个订单号，不是手机号。
+
+        没有 `(?!\\d)` 的话这条会报——而误报比漏报更快让规则被关掉（规则 79）。
+        """
+        self.assertEqual(find_pii("138" + "12345678" + "00"), [])
+
+    def test_embedded_in_prose_is_still_found(self) -> None:
+        hits = find_pii("手机号：159" + "87654321，备用号 138" + "12345678")
+        self.assertEqual(len(hits), 2)
+
+
+class PiiIdNumberTests(unittest.TestCase):
+    """F7：身份证规则。**校验位是这道闸**——编造的号通不过，真实泄漏的必然通过。"""
+
+    def test_checksum_algorithm_matches_the_standard(self) -> None:
+        """用一个公开的合法样例钉住算法本身（拼出来写，别让规则抓到本文件）。"""
+        known = "110105" + "19491231" + "002" + "X"
+        self.assertTrue(public_release_check._id_checksum_ok(known))
+        self.assertTrue(public_release_check._looks_like_real_id(known))
+
+    def test_flags_a_checksum_valid_id(self) -> None:
+        number = _valid_id("110105" + "19900101" + "123")
+        self.assertEqual(len(number), 18)
+        hits = find_pii("证件号 " + number)
+        self.assertEqual(len(hits), 1)
+        self.assertEqual(hits[0][2], "pii_id_number")
+
+    def test_allows_a_made_up_id_that_fails_the_checksum(self) -> None:
+        self.assertEqual(find_pii("110101" + "19900101" + "1234"), [])
+
+    def test_boundary_rejects_a_19_digit_run(self) -> None:
+        """两侧的 `(?!\\d)` 是承重的：19 位数字串里不该截出一个"身份证"。"""
+        number = _valid_id("110105" + "19900101" + "123")
+        self.assertEqual(find_pii("9" + number), [])
+
+    def test_a_bad_checksum_never_reports(self) -> None:
+        """穷举：把校验位换成别的字符，只有正确那一个能被认出来。
+
+        这条防的是"校验位算错但恰好自洽"——如果算法写反了，这里会同时认出两个。
+        """
+        body = "110105" + "19900101" + "123"
+        accepted = [c for c in "0123456789X" if public_release_check._id_checksum_ok(body + c)]
+        self.assertEqual(len(accepted), 1, f"校验位判定不唯一：{accepted}")
+
+
+class AbsolutePathDetectionTests(unittest.TestCase):
+    """F8：绝对路径从 3 种形态扩到 6 种，并带**合成路径识别**。
+
+    实测新增的通用盘符规则命中 10 处，**全部**在 `scripts/misc/tests/` 且都是合成值；
+    `/Users/` `/home/` `/tmp/` 三种新形态命中 0 处（潜伏缺口，不是活缺陷）。
+    """
+
+    def test_flags_macos_home(self) -> None:
+        hits = _path_hits("/Use" + "rs/zhangsan/code/x.py")
+        self.assertEqual([name for name, _ in hits], ["macos_user_path"])
+
+    def test_flags_linux_home(self) -> None:
+        """小写 `home`。实测把 `h` 写成 `H`（`[H]ome`）这条规则一次都不命中。"""
+        hits = _path_hits("/ho" + "me/lisi/work/x.py")
+        self.assertEqual([name for name, _ in hits], ["linux_user_path"])
+
+    def test_flags_a_bare_drive_letter(self) -> None:
+        hits = _path_hits("E:" + "\\projects\\secret\\x.py")
+        self.assertEqual([name for name, _ in hits], ["generic_drive_path"])
+
+    def test_url_is_not_a_drive_path(self) -> None:
+        """`(?<![\\w])` 是承重的：没有它，协议分隔符前那个字母加冒号会被当成盘符。"""
+        self.assertEqual(_path_hits("https://example.com/a.md"), [])
+
+    def test_synthetic_fixtures_are_exempt(self) -> None:
+        text = "\n".join(
+            [
+                "C:" + "\\tools\\someone\\python.exe",
+                "D:/work/example/tools/x",
+                "C:/py.exe",
+                "C:" + "\\it's\\python.exe",
+                "C:" + "\\Users\\<name>\\x.py",
+            ]
+        )
+        self.assertEqual(_path_hits(text), [])
+
+    def test_a_real_user_name_is_not_excused_by_the_synthetic_rule(self) -> None:
+        """判据落在**路径内容**上，不是"文件是不是测试"。
+
+        所以测试目录里真抄进一条带真用户名的路径，照样会被 `windows_user_path` 抓住。
+        """
+        hits = _path_hits("C:" + "\\Users\\" + "zhangsan" + "\\x.py")
+        self.assertIn("windows_user_path", [name for name, _ in hits])
+
+    def test_specific_rule_wins_over_the_generic_one(self) -> None:
+        """同一条命中只报一次，且报**具体**那条——重复报是把噪音当成覆盖。"""
+        case = _SANDBOX / f"case-{next(_COUNTER)}"
+        case.mkdir(parents=True, exist_ok=True)
+        target = case / "leak.py"
+        target.write_text(
+            "ROOT = " + repr("D:" + "/Git" + "/automation-suite") + "\n", encoding="utf-8"
+        )
+
+        original = public_release_check.iter_candidate_files
+        public_release_check.iter_candidate_files = lambda: [target]
+        stream = io.StringIO()
+        try:
+            with contextlib.redirect_stdout(stream):
+                public_release_check.main()
+        finally:
+            public_release_check.iter_candidate_files = original
+
+        issues = json.loads(stream.getvalue())["issues"]
+        path_types = {name for name, _ in public_release_check.PATH_PATTERNS}
+        kinds = [issue["type"] for issue in issues if issue["type"] in path_types]
+        self.assertEqual(kinds, ["hardcoded_d_git"], f"应当是具体规则胜出：{kinds}")
 
 
 class CandidateScopeTests(unittest.TestCase):
@@ -215,6 +411,51 @@ class RequiredFilesDriftTests(unittest.TestCase):
 
     def test_no_duplicates(self) -> None:
         self.assertEqual(len(REQUIRED_FILES), len(set(REQUIRED_FILES)))
+
+
+class ScanFloorTests(unittest.TestCase):
+    """F10：扫描面塌了要报红，而不是报 ok。
+
+    修复前 "只扫到 1 个文件" 与 "扫到 222 个文件" 都报 `ok: true`——
+    前者意味着这条检查**其实什么都没看**，而退出码上看不出区别。
+    """
+
+    def _run_with(self, files: list[Path]) -> tuple[int, dict]:
+        original = public_release_check.iter_candidate_files
+        public_release_check.iter_candidate_files = lambda: list(files)
+        stream = io.StringIO()
+        try:
+            with contextlib.redirect_stdout(stream):
+                code = public_release_check.main()
+        finally:
+            public_release_check.iter_candidate_files = original
+        return code, json.loads(stream.getvalue())
+
+    def test_tiny_scan_is_a_failure_not_a_pass(self) -> None:
+        code, report = self._run_with([Path(__file__)])
+        self.assertEqual(code, 1)
+        self.assertFalse(report["ok"])
+        self.assertIn("scan_too_small", {issue["type"] for issue in report["issues"]})
+
+    def test_report_declares_the_floor(self) -> None:
+        """下限必须**报出来**，否则它是魔法数字，读日志的人不知道判据是什么。"""
+        _, report = self._run_with([Path(__file__)])
+        self.assertEqual(report["scan_floor"], MIN_SCANNED_FILES)
+
+    def test_just_below_the_floor_fails_and_just_above_passes(self) -> None:
+        """边界两侧都要钉住，否则守卫可能只是恒真/恒假。"""
+        below = [Path(__file__)] * (MIN_SCANNED_FILES - 1)
+        at = [Path(__file__)] * MIN_SCANNED_FILES
+        self.assertEqual(self._run_with(below)[0], 1)
+        self.assertEqual(self._run_with(at)[0], 0)
+
+    def test_real_repository_clears_the_floor(self) -> None:
+        stream = io.StringIO()
+        with contextlib.redirect_stdout(stream):
+            code = public_release_check.main()
+        report = json.loads(stream.getvalue())
+        self.assertEqual(code, 0, report["issues"])
+        self.assertGreaterEqual(report["scanned_files"], MIN_SCANNED_FILES)
 
 
 if __name__ == "__main__":
