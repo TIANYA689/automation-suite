@@ -3,6 +3,8 @@ name: CI
 on:
   push:
   pull_request:
+  # 手动触发：仓库新建时 Actions 默认关闭，启用后需要一个不造空提交就能验证的入口。
+  workflow_dispatch:
 
 permissions:
   contents: read
