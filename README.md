@@ -77,6 +77,7 @@ Actions 在新建仓库里**需要手动启用**（`Settings → Actions → Gen
 ```bash
 python scripts/misc/run_ci_checks.py         # 跑完 CI 定义的全部检查步骤
 python scripts/misc/run_ci_checks.py --list  # 只看派生出了哪些步骤、跳过了哪些
+python scripts/misc/run_ci_checks.py --as-ci # 在 git clone 出来的目录里预演 CI（不应用本地改写）
 ```
 
 ## 文档地图

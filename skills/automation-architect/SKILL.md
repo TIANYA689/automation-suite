@@ -306,11 +306,17 @@ project/
 ```powershell
 python scripts/misc/run_ci_checks.py         # 跑完 CI 定义的全部检查步骤
 python scripts/misc/run_ci_checks.py --list  # 只看派生出了哪些步骤、跳过了哪些
+python scripts/misc/run_ci_checks.py --as-ci # 在 git clone 出来的目录里预演 CI
 ```
 
 `ci.yml` 只在 GitHub Actions 上执行，而 **Actions 在新建仓库里需要手动启用**
 （`Settings → Actions → General → Allow all actions`）。没启用时，上面这一条命令
 就是**唯一**的执行面——「本地绿 ≠ CI 有效」的反面同样成立：**CI 不跑，本地就是全部**。
+
+要回答「**CI 会不会绿**」，得用 `--as-ci`：它不应用本地改写（默认模式会把 CI 的
+环境断言换成本地等价物，所以跑绿只说明本地口径绿）。但它必须在**干净克隆**里跑——
+CI 的 `actions/checkout` 就是 clone，所以正确做法是 `git clone` 到临时目录再跑，
+**不是** `git archive`（不带 `.git`、行尾语义不同，跑出来的是伪影）。
 
 要逐条手工跑（例如只想跑一项）：
 
