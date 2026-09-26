@@ -252,6 +252,88 @@ class OverrideTests(unittest.TestCase):
         self.assertEqual(applied, [])
 
 
+class AsCiTests(unittest.TestCase):
+    """`--as-ci` 是唯一能回答「CI 会不会绿」的模式。
+
+    它必须**不**应用本地改写（否则预演的还是本地口径），且必须说清
+    「你不在干净克隆里」——`--expect-cases 0` 是**对空克隆的断言**，
+    在本地仓库照搬必然红，不说清楚就会把人引向错误方向。
+    """
+
+    FIXTURE = (
+        "jobs:\n  checks:\n    steps:\n"
+        "      - name: Case state validation\n"
+        "        run: python scripts/misc/validate_case_states.py --expect-cases 0\n"
+    )
+
+    def setUp(self) -> None:
+        self.root = _SANDBOX / f"case-{next(_COUNTER)}"
+        self.root.mkdir(parents=True, exist_ok=True)
+        self._original = (rcc.ROOT, rcc.WORKFLOW)
+        rcc.ROOT = self.root
+        rcc.WORKFLOW = self.root / "ci.yml"
+        rcc.WORKFLOW.write_text(self.FIXTURE, encoding="utf-8", newline="\n")
+
+    def tearDown(self) -> None:
+        rcc.ROOT, rcc.WORKFLOW = self._original
+
+    def _main(self, argv: list[str]) -> tuple[int, str]:
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            code = rcc.main(argv)
+        return code, buffer.getvalue()
+
+    @staticmethod
+    def _derived_command(output: str, name: str) -> str:
+        """取「派生出 N 个检查步骤」那一段里该步骤的命令行。
+
+        **必须锚到这一行**，不能在全文里搜串：默认模式的改写说明里也会出现
+        `--expect-cases 0`（在「CI：」那一行），全文搜串会把两种模式判成一样。
+        """
+        marker = f"- {name}："
+        for line in output.splitlines():
+            if line.strip().startswith(marker):
+                return line.strip()
+        raise AssertionError(f"没在输出里找到派生步骤 `{name}`：\n{output}")
+
+    def test_as_ci_keeps_the_command_verbatim(self) -> None:
+        code, output = self._main(["--as-ci", "--list"])
+        self.assertEqual(code, 0)
+        self.assertIn(
+            "--expect-cases 0",
+            self._derived_command(output, "Case state validation"),
+        )
+        self.assertNotIn("本地改写了", output)
+        self.assertIn("按 CI 原样跑", output)
+
+    def test_default_mode_applies_the_override(self) -> None:
+        """对照组：不带 `--as-ci` 时派生的命令必须被改写，否则 `--as-ci` 就没有区分度。"""
+        code, output = self._main(["--list"])
+        self.assertEqual(code, 0)
+        self.assertNotIn(
+            "--expect-cases 0",
+            self._derived_command(output, "Case state validation"),
+        )
+        self.assertIn("本地改写了", output)
+
+    def test_as_ci_warns_when_cases_is_not_empty(self) -> None:
+        (self.root / "cases").mkdir(exist_ok=True)
+        (self.root / "cases" / "job.json").write_text("{}", encoding="utf-8")
+        _, output = self._main(["--as-ci", "--list"])
+        self.assertIn("提示", output)
+        self.assertIn("cases/", output)
+
+    def test_clean_clone_is_not_warned(self) -> None:
+        _, output = self._main(["--as-ci", "--list"])
+        self.assertNotIn("提示", output)
+
+    def test_routing_index_also_marks_a_dirty_tree(self) -> None:
+        """第二个廉价信号：`routing.index.json` 是派生且被 gitignore，克隆里不该有。"""
+        (self.root / "routing.index.json").write_text("{}", encoding="utf-8")
+        _, output = self._main(["--as-ci", "--list"])
+        self.assertIn("routing.index.json", output)
+
+
 class RealRepositoryTests(unittest.TestCase):
     def test_real_workflow_derives_the_expected_checks(self) -> None:
         text = (rcc.WORKFLOW if rcc.WORKFLOW.exists() else _REAL_ROOT / ".github" / "workflows" / "ci.yml")

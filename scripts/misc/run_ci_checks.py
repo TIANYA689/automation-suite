@@ -24,6 +24,14 @@ CI 会先装依赖，本地要自己装：
 
     python -m pip install -r scripts/automation/routing/requirements.txt
 
+**预演 CI**：`--as-ci` 不应用任何本地改写，断言与 `ci.yml` 逐字一致。
+但它必须在**干净的克隆**里跑——CI 的 `actions/checkout` 就是 clone，
+所以正确的预演方式是 `git clone` 到临时目录再跑，**不要**用 `git archive`
+（不带 `.git`、行尾语义不同，跑出来的 drift 是伪影）：
+
+    git clone <本仓库路径> /tmp/ci-probe && cd /tmp/ci-probe
+    python scripts/misc/run_ci_checks.py --as-ci
+
 用法：
 
     python scripts/misc/run_ci_checks.py                  # 跑全部
@@ -31,6 +39,7 @@ CI 会先装依赖，本地要自己装：
     python scripts/misc/run_ci_checks.py --only 引用      # 只跑名字/命令含该串的步骤
     python scripts/misc/run_ci_checks.py --skip mcp       # 跳过名字/命令含该串的步骤
     python scripts/misc/run_ci_checks.py --fail-fast      # 对齐 CI 的遇错即停
+    python scripts/misc/run_ci_checks.py --as-ci          # 按 CI 原样（用于克隆里预演）
     python scripts/misc/run_ci_checks.py --json           # 机器可读
 
 零第三方依赖。
@@ -163,6 +172,22 @@ def apply_local_overrides(
     return rewritten, applied
 
 
+def _not_a_clean_clone() -> str | None:
+    """`--as-ci` 的断言假设「干净克隆」。返回一句说明，或 None 表示看起来干净。
+
+    判据只用**两个廉价信号**，不跑 `git status --ignored`（`tmp/` 有几千个文件，太慢）：
+    `cases/` 非空、或 `routing.index.json` 存在——这两样在干净克隆里都不该有。
+    """
+    cases = ROOT / "cases"
+    if cases.is_dir():
+        entries = list(cases.iterdir())
+        if entries:
+            return f"cases/ 下有 {len(entries)} 个条目（干净克隆里 cases/ 是空的，被 .gitignore 挡住）"
+    if (ROOT / "routing.index.json").exists():
+        return "routing.index.json 存在（干净克隆里没有：它是派生文件且被 .gitignore 挡住）"
+    return None
+
+
 def run_step(step: dict[str, str], timeout: int) -> dict[str, object]:
     argv = shlex.split(step["command"])
     argv[0] = sys.executable  # CI 里的 `python` 换成当前解释器，参数原样保留
@@ -206,6 +231,11 @@ def main(argv: list[str] | None = None) -> int:
         help="跳过名字或命令含该串的步骤（可重复）；被跳过的会打印出来",
     )
     parser.add_argument("--fail-fast", action="store_true", help="遇错即停（对齐 CI）")
+    parser.add_argument(
+        "--as-ci",
+        action="store_true",
+        help="按 CI 原样跑：不应用本地改写（用于在 git clone 出来的目录里预演 CI）",
+    )
     parser.add_argument("--verbose", action="store_true", help="成功的步骤也打印完整输出")
     parser.add_argument("--timeout", type=int, default=900, help="单步超时秒数")
     args = parser.parse_args(argv)
@@ -222,7 +252,17 @@ def main(argv: list[str] | None = None) -> int:
         print("FAIL: 没从 ci.yml 派生出任何检查步骤——判据空转（派生规则或工作流结构变了）")
         return 1
 
-    steps, overrides = apply_local_overrides(steps)
+    if args.as_ci:
+        # 按 CI 原样：不应用 LOCAL_OVERRIDES。这是唯一能回答「CI 会不会绿」的模式。
+        # 但它照搬的是 CI 对**空克隆**的断言，所以要先说清当前目录像不像克隆。
+        steps, overrides = steps, []
+        dirty = _not_a_clean_clone()
+        if dirty:
+            print(f"提示：{dirty}")
+            print("      `--as-ci` 照搬 CI 对**空克隆**的断言，当前目录不是干净克隆，")
+            print("      相关步骤失败属预期。要在克隆里预演：git clone <仓库> <临时目录>。")
+    else:
+        steps, overrides = apply_local_overrides(steps)
 
     selected = steps
     if args.only:
@@ -267,6 +307,8 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"      CI：{item['from']}")
                 print(f"      本地：{item['to']}")
                 print(f"      为什么：{item['why']}")
+        elif args.as_ci:
+            print("\n按 CI 原样跑：未应用任何本地改写（断言与 ci.yml 逐字一致）。")
         return 0
 
     results: list[dict[str, object]] = []
@@ -293,6 +335,7 @@ def main(argv: list[str] | None = None) -> int:
                 {
                     "ok": not failed,
                     "workflow": WORKFLOW.relative_to(ROOT).as_posix(),
+                    "as_ci": args.as_ci,
                     "derived": len(steps),
                     "ran": len(results),
                     "failed": [r["name"] for r in failed],
@@ -314,6 +357,8 @@ def main(argv: list[str] | None = None) -> int:
         for item in overrides:
             print(f"  - {item['name']}：CI `{item['from']}` → 本地 `{item['to']}`")
             print(f"      为什么：{item['why']}")
+    elif args.as_ci:
+        print("按 CI 原样跑：未应用任何本地改写（断言与 ci.yml 逐字一致）。")
     print(f"未执行（非检查步骤，共 {len(skipped)} 个）：")
     for item in skipped:
         print(f"  - {item['name']}：{item['why']}")
