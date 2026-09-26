@@ -106,6 +106,11 @@ BARE_NAME_EXEMPTIONS: dict[str, str] = {
     "exports.txt": "工具运行时的产出文件名，不是本仓库文件",
     "imports.txt": "工具运行时的产出文件名，不是本仓库文件",
     "strings.txt": "工具运行时的产出文件名，不是本仓库文件",
+    # 下面两条是 2026-09-26 用 `run_ci_checks.py --as-ci` 在**干净克隆**里预演 CI 时
+    # 才暴露出来的：本地工作区里这两个文件都存在（被 gitignore），克隆里没有，
+    # 于是**本地绿、CI 红**。修法不是"把判据放宽"，而是承认这两个名字本仓库不拥有。
+    "CLAUDE.md": "本仓库**有意不提交**（代理运行时不读取、不采用）；文档只在讲「哪些文件被 gitignore」时举例点名它，不是引用",
+    "plan.json": "作业产物的示例名（`har_probe` 的意图声明，实际落盘为 `<name>.plan.json`），读者自己生成，本仓库不拥有",
 }
 
 # 整篇在讲**上游仓库**文件的文档：其中的裸文件名指上游的文件，本仓库不拥有。
@@ -274,12 +279,25 @@ def _build_filename_index() -> dict[str, list[Path]]:
     """文件名 → 路径们。用于解析**裸文件名**（无斜杠）。
 
     按 ROOT 缓存：测试会把 ROOT 指到沙箱，各沙箱各建各的索引，不会串味。
-    遍历时剪掉 `SKIP_DIR_NAMES` 与 `tmp/`（`tmp/` 实测有几千个文件，
-    且全是本地产物，不该参与"仓库里有没有这个名字"的判断）。
+
+    剪枝名单**从 `UNTRACKED_PREFIXES` 派生**，不在这里另抄一份。这里曾经写死
+    `d != "tmp"`，而 `UNTRACKED_PREFIXES` 有六项——**同一份「本地产物目录」名单
+    存在两处且不一致**，于是 `exports/` 下的 `plan.json` 让**本地**索引"找到"了一个
+    **干净克隆里不存在**的名字：**本地绿、CI 红**（2026-09-26 用
+    `run_ci_checks.py --as-ci` 在克隆里预演 CI 时才暴露）。
+
+    只在**顶层**剪——`UNTRACKED_PREFIXES` 存的是相对仓库根的路径前缀，
+    按 basename 在任意层级剪会连带剪掉 `kb/cases/` 这类同名子目录。
     """
     index: dict[str, list[Path]] = {}
+    untracked = {prefix.rstrip("/") for prefix in UNTRACKED_PREFIXES}
     for current, dirs, files in os.walk(ROOT):
-        dirs[:] = [d for d in dirs if d not in SKIP_DIR_NAMES and d != "tmp"]
+        if Path(current) == ROOT:
+            dirs[:] = [
+                d for d in dirs if d not in SKIP_DIR_NAMES and d not in untracked
+            ]
+        else:
+            dirs[:] = [d for d in dirs if d not in SKIP_DIR_NAMES]
         for name in files:
             index.setdefault(name, []).append(Path(current) / name)
     return index

@@ -9,6 +9,7 @@ import itertools
 import json
 import re
 import shutil
+import subprocess
 import sys
 import tempfile
 import textwrap
@@ -62,6 +63,30 @@ atexit.register(_cleanup, _SANDBOX)
 # 真实仓库根：从模块文件反推，**不受 `check_doc_refs.ROOT` 被测试猴补影响**。
 # 用于钉"豁免指向的文档真实存在"这类必须打在真仓库上的判据。
 _REAL_ROOT = Path(check_doc_refs.__file__).resolve().parents[2]
+
+
+def _tracked_basenames() -> set[str] | None:
+    """`git ls-files` 的 basename 集合；git 不可用时返回 None。
+
+    用 git 而不是 `Path.exists()`：后者在**本地工作区**会被 gitignore 的文件喂饱，
+    于是"本仓库拥不拥有这个名字"在本地与干净克隆里是两个答案——
+    **本地绿、CI 红**（2026-09-26 实测）。
+    """
+    try:
+        completed = subprocess.run(
+            ["git", "ls-files"],
+            cwd=_REAL_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if completed.returncode != 0:
+        return None
+    return {
+        Path(line).name for line in completed.stdout.splitlines() if line.strip()
+    }
 
 
 class _SandboxCase(unittest.TestCase):
@@ -281,6 +306,32 @@ class BareFilenameTests(_SandboxCase):
         self.assertEqual(report["drifts"][0]["kind"], "path_missing")
         self.assertIn("create-py-script.md", report["drifts"][0]["detail"])
 
+    def test_untracked_dirs_are_not_searched_for_bare_names(self) -> None:
+        """本地产物目录**不参与**「仓库里有没有这个名字」的判断。
+
+        这里曾经只剪 `tmp/`，而 `UNTRACKED_PREFIXES` 有六项——**同一份名单存在
+        两处且不一致**。于是 `exports/` 下的 `plan.json` 让**本地**解析成功，
+        而干净克隆里没有这个文件：**本地绿、CI 红**。
+        现在名单从 `UNTRACKED_PREFIXES` 派生，任意一个本地产物目录都不该被搜到。
+        """
+        for prefix in check_doc_refs.UNTRACKED_PREFIXES:
+            self._write(f"{prefix}probe_name.py", "x\n")
+        self._write("README.md", "见 `probe_name.py`。\n")
+        report = run()
+        self.assertFalse(
+            report["ok"], "本地产物目录里的同名文件不该让裸文件名解析成功"
+        )
+
+    def test_tracked_dir_is_still_searched_for_bare_names(self) -> None:
+        """对照组：正常目录（`kb/`）里的同名文件**必须**能被解析到。
+
+        没有这一条，把索引整个清空也能让上面那条通过。
+        """
+        self._write("kb/probe_name.py", "x\n")
+        self._write("README.md", "见 `probe_name.py`。\n")
+        report = run()
+        self.assertTrue(report["ok"], report["drifts"])
+
     def test_suffix_only_token_is_exempt(self) -> None:
         """`.js` 指的是"这类文件"，不是某个文件——无从校验存在性。"""
         self._write("README.md", "产物是 `.js` 或 `.py`。\n")
@@ -377,6 +428,32 @@ class ExemptionHygieneTests(unittest.TestCase):
         for reason, why in EXEMPTIONS:
             self.assertTrue(reason)
             self.assertGreater(len(why), 10, f"豁免 {reason} 的理由太短，等于没写")
+
+    def test_every_bare_name_exemption_states_a_reason(self) -> None:
+        table = check_doc_refs.BARE_NAME_EXEMPTIONS
+        self.assertTrue(table, "豁免表空了，裸文件名判据会立刻开始误报")
+        for name, why in table.items():
+            with self.subTest(name=name):
+                self.assertGreater(len(why), 10, f"豁免 {name} 的理由太短，等于没写")
+
+    def test_bare_name_exemptions_are_not_tracked_files(self) -> None:
+        """豁免的语义是「**本仓库不拥有**」，所以这些名字不该被 git 跟踪。
+
+        防的是「豁免变成逃生门」：把本仓库**真有**的文件塞进豁免表，
+        引用写错就被永久掩盖。判据用 `git ls-files` 而不是 `Path.exists()`——
+        后者会被 gitignore 的文件喂饱，在本地与干净克隆里给出两个答案。
+        """
+        tracked = _tracked_basenames()
+        self.assertIsNotNone(
+            tracked, "git 不可用——这条判据需要 git，不能静默跳过（跳过与通过要区分）"
+        )
+        for name in check_doc_refs.BARE_NAME_EXEMPTIONS:
+            with self.subTest(name=name):
+                self.assertNotIn(
+                    name,
+                    tracked,
+                    f"{name} 被 git 跟踪，说明本仓库拥有它，不该进豁免表",
+                )
 
     def test_report_prints_exemptions_with_hit_counts(self) -> None:
         report = run()
