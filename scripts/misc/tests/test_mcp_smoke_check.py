@@ -95,6 +95,12 @@ class CiWiringTests(unittest.TestCase):
             "CI 未要求 mcp 必须存在——缺依赖时会静默跳过，门禁形同虚设",
         )
 
+    def test_expected_tools_include_workbench_surface(self) -> None:
+        self.assertTrue({
+            "workbench_plan", "workbench_run", "workbench_resume",
+            "workbench_status", "workbench_list",
+        } <= smoke.EXPECTED_TOOLS)
+
 
 if __name__ == "__main__":
     unittest.main()

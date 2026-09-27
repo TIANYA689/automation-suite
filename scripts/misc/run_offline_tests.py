@@ -125,7 +125,11 @@ def run_suite(
         cwd=working_directory,
         env=environment,
         capture_output=True,
+        # 测试子进程统一按 UTF-8 解码；Windows 中文代码页会把子进程的
+        # UTF-8 输出误当成 GBK，导致解码线程异常并让 stdout/stderr 变成 None。
         text=True,
+        encoding="utf-8",
+        errors="replace",
         check=False,
     )
     output = completed.stdout + completed.stderr

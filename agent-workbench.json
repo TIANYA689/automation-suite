@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "name": "automation-suite-agent-workbench",
+  "description": "automation-suite 自有项目的自然语言自动化工作台：驱动路由、知识检索、技能加载、模块发现和可恢复执行。",
+  "project": {
+    "name": "automation-suite",
+    "root": "."
+  },
+  "entrypoint": "python scripts/automation/workbench.py",
+  "mcp": {
+    "server": "automation_suite_router",
+    "entrypoint": "scripts/automation/routing/mcp_server.py",
+    "tools": [
+      "workbench_plan",
+      "workbench_run",
+      "workbench_resume",
+      "workbench_status",
+      "workbench_list"
+    ],
+    "registration": "python scripts/misc/install_router_mcp.py --write all"
+  },
+  "input": {
+    "type": "string",
+    "field": "query",
+    "example": "分析授权样本的 JS 混淆并给出可验证的还原计划"
+  },
+  "commands": {
+    "plan": "plan <query> [--top-k N]",
+    "run": "run <query> [--module NAME ...] [--execute]",
+    "resume": "resume <run_id> [--module NAME ...] [--execute]",
+    "status": "status <run_id>",
+    "list": "list [--limit N]"
+  },
+  "autonomous_steps": [
+    "route_task",
+    "kb_route",
+    "load_skill",
+    "describe_module",
+    "workbench_plan",
+    "workbench_run",
+    "workbench_resume",
+    "workbench_status",
+    "workbench_list",
+    "run_module (only when explicitly requested)"
+  ],
+  "artifacts": {
+    "root": "exports/automation/workbench/<run_id>/",
+    "plan": "plan.json",
+    "state": "state.json",
+    "events": "events.jsonl",
+    "module_results": "modules/"
+  },
+  "states": ["READY", "RUNNING", "DONE", "BLOCKED", "FAILED", "UNROUTED"],
+  "safety": {
+    "natural_language_is_not_shell": true,
+    "module_execution_default": "dry_run",
+    "module_execution_requires": ["--execute", "routing.source.json execution.allowlist"],
+    "audit_log": "exports/automation/module-audit.jsonl",
+    "original_files_mutated": false
+  },
+  "consumer_contract": {
+    "stdout": "JSON summary",
+    "resume_key": "run_id",
+    "next_action": "state.json.next_action",
+    "blocked_actions": "state.json.blocked_actions",
+    "failed_actions": "state.json.failed_actions",
+    "evidence": "plan.json, events.jsonl and modules/*.json"
+  }
+}

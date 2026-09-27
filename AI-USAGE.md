@@ -30,7 +30,7 @@
 |---|---|---|
 | 单一事实源 | `routing.source.json` | 12 个技能的触发信号、角色、调用模式、模块分类与路由规则；**唯一需要手工维护的路由文件** |
 | 派生索引 | `routing.index.json` | 由事实源 + 磁盘扫描生成，含 SKILL.md 的 hash、模块清单；派生产物，不提交 |
-| 路由 MCP | `scripts/automation/routing/mcp_server.py` | 6 个只读工具 `route_task` / `load_skill` / `list_skills` / `kb_route` / `list_modules` / `describe_module`，外加唯一的非只读工具 `run_module`（白名单 + dry-run 默认 + 审计日志） |
+| 路由与工作台 MCP | `scripts/automation/routing/mcp_server.py` | 8 个只读工具 `route_task` / `load_skill` / `list_skills` / `kb_route` / `list_modules` / `describe_module` / `workbench_status` / `workbench_list`，以及 4 个状态变更工具 `run_module` / `workbench_plan` / `workbench_run` / `workbench_resume`（模块执行仍受白名单 + dry-run 默认 + 审计日志约束） |
 
 ```bash
 # 重建索引
@@ -97,6 +97,21 @@ python scripts/misc/mcp_smoke_check.py
 
 > 改路由信号只改 `routing.source.json`，然后重建索引；`SKILLS.md`、`AI-USAGE.md`、`skills/automation-architect/SKILL.md`、`kb/automation/techniques/01-routing.md` 由漂移检查守住一致性。
 
+## Agent 工作台
+
+自然语言入口见 [`agent-workbench.json`](agent-workbench.json) 和 [`docs/agent-workbench.md`](docs/agent-workbench.md)。该工作台只服务当前 Automation Suite 项目；CLI 与同一 MCP 服务器均提供工作台动作：路由技能 → 路由知识 → 加载主技能 → 盘点模块 →（显式授权时）执行模块。
+
+```powershell
+# Agent 直接把用户原话作为 query 传入；stdout 是机器可读 JSON
+python scripts/automation/workbench.py run "分析授权样本的 JS 混淆并给出验证计划"
+# 用返回的 run_id 继续
+python scripts/automation/workbench.py resume <run_id>
+```
+
+已注册路由 MCP 的 Agent 可直接调用 `workbench_run`、`workbench_resume`、`workbench_status` 和 `workbench_list`，无需自行拼接 CLI；调用参数与 CLI 保持一致。
+
+每次运行落在 `exports/automation/workbench/<run_id>/`，包含计划、状态、事件日志和模块结果。默认只做只读发现；模块真实执行必须同时满足 `--execute` 与 `routing.source.json` 的 `execution.allowlist`，且沿用 `run_module` 的超时和审计日志护栏。
+
 ## 默认流程
 
 1. **路由** — 读 `kb/**/techniques/`，判断任务方向与推荐技能。
@@ -123,3 +138,5 @@ python scripts/misc/mcp_smoke_check.py
 | `routing.source.json` | 路由单一事实源 | 是 |
 | `routing.index.json` | 派生路由索引 | 否 |
 | `scripts/automation/routing/` | 路由引擎与 MCP 服务器 | 是 |
+| `scripts/automation/workbench.py` | 自然语言 Agent 工作台入口 | 是 |
+| `agent-workbench.json` | Agent 消费协议与命令清单 | 是 |

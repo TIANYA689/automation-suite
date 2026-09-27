@@ -35,7 +35,18 @@
 
 1. 读 [`AI-USAGE.md`](AI-USAGE.md) —— 全局入口，含任务路由表与默认流程。
 2. 打开路由结论对应的 `skills/<name>/SKILL.md`，按其启动协议执行。
-3. 提交前跑本地检查：
+3. 对自然语言需求直接启动 Agent 工作台：
+
+```powershell
+python scripts/automation/workbench.py run "开发一个 Python 自动化脚本并给出验证步骤"
+python scripts/automation/workbench.py resume <run_id>
+```
+
+工作台协议与证据格式见 [`agent-workbench.json`](agent-workbench.json) 和 [`docs/agent-workbench.md`](docs/agent-workbench.md)。
+
+已注册路由 MCP 的 Agent 还可直接调用 `workbench_run`，并用 `workbench_resume`、`workbench_status`、`workbench_list` 管理可恢复运行；默认只做只读发现，模块真实执行仍需显式授权。
+
+4. 提交前跑本地检查：
 
 ```powershell
 python scripts/misc/public_release_check.py    # 公开前合规检查

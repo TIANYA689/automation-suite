@@ -1,15 +1,21 @@
 """技能路由 MCP 服务器（stdio）。
 
-暴露 7 个工具，其中前 6 个为只读：
+暴露 12 个工具，其中前 8 个为只读：
 - route_task       按查询返回 primary/complementary/additional 候选与证据
 - load_skill       按需返回 SKILL.md 正文（渐进式披露，避免一次性占满上下文）
 - list_skills      列出技能清单、版本与调用模式
 - kb_route         技能路由的第二跳：把需求映射到具体 kb 知识文件
 - list_modules     列出 tools/automation-modules 下的模块目录
 - describe_module  返回单个模块的 README 摘要、入口文件与依赖
-- run_module       执行模块脚本；**唯一非只读工具**，受白名单 + 审计日志 + dry-run 默认三道护栏约束
+- run_module       执行模块脚本；受白名单 + 审计日志 + dry-run 默认三道护栏约束
+- workbench_plan   创建自然语言工作台计划
+- workbench_run    推进一轮自然语言工作台运行
+- workbench_resume 恢复已有工作台运行
+- workbench_status 读取工作台运行状态
+- workbench_list   列出最近工作台运行
 
-最终技能选择由 Agent 决定；模块执行默认不落地。
+最终技能选择由 Agent 决定；模块执行默认不落地。工作台工具只把状态与证据写入
+exports/，不会覆盖原件。
 
 启动：
     python -m automation.routing.mcp_server
@@ -31,12 +37,14 @@ if __package__ in (None, ""):
     from automation.routing import kb_route as _kb_route
     from automation.routing import run_module as _run_module
     from automation.routing.index_builder import build_index
+    from automation.workbench import WorkbenchRun
 else:
     from . import describe_module as _describe_module
     from . import find_root, load_skill as _load_skill, route as _route
     from . import kb_route as _kb_route
     from . import run_module as _run_module
     from .index_builder import build_index
+    from automation.workbench import WorkbenchRun
 
 try:  # mcp 2.x
     from mcp.server.mcpserver import MCPServer as _Server
@@ -210,7 +218,7 @@ def run_module(
     3. 审计日志——每次调用（含被拒绝的）都会追加到 execution.audit_log。
 
     始终以 argv 列表调用（不经 shell），cwd 固定为模块目录，带超时与输出截断。
-    这是本服务器唯一的非只读工具。
+    这是本服务器的模块执行工具；工作台状态工具另有独立审计产物。
     """
     root, index = _current_index()
     return _run_module(
@@ -222,6 +230,63 @@ def run_module(
         dry_run=dry_run,
         timeout=timeout,
     )
+
+
+def _workbench_root() -> Path:
+    return Path(os.environ.get("AUTOMATION_SUITE_ROOT") or find_root())
+
+
+@_tool(EXECUTES)
+def workbench_plan(query: str, top_k: int = 5) -> dict[str, Any]:
+    """创建自然语言工作台计划，返回可恢复的 run_id 与证据路径。"""
+    root = _workbench_root()
+    run = WorkbenchRun.create(root, query, top_k=max(1, min(int(top_k), 20)))
+    return run.summary()
+
+
+@_tool(EXECUTES)
+def workbench_run(
+    query: str,
+    modules: list[str] | None = None,
+    execute: bool = False,
+    top_k: int = 5,
+) -> dict[str, Any]:
+    """从自然语言创建并推进工作台运行；默认只读发现和模块 dry-run。"""
+    root = _workbench_root()
+    run = WorkbenchRun.create(root, query, top_k=max(1, min(int(top_k), 20)))
+    return run.advance(execute=bool(execute), modules=modules or [])
+
+
+@_tool(EXECUTES)
+def workbench_resume(
+    run_id: str,
+    modules: list[str] | None = None,
+    execute: bool = False,
+) -> dict[str, Any]:
+    """恢复一个已有工作台运行；默认不执行模块。"""
+    run = WorkbenchRun.open(_workbench_root(), run_id)
+    return run.advance(execute=bool(execute), modules=modules or [])
+
+
+@_tool(READ_ONLY)
+def workbench_status(run_id: str) -> dict[str, Any]:
+    """读取工作台运行状态与待处理动作。"""
+    return WorkbenchRun.open(_workbench_root(), run_id).summary()
+
+
+@_tool(READ_ONLY)
+def workbench_list(limit: int = 20) -> dict[str, Any]:
+    """列出最近工作台运行。"""
+    root = _workbench_root()
+    base = root / "exports" / "automation" / "workbench"
+    items: list[dict[str, Any]] = []
+    if base.is_dir():
+        for directory in sorted((p for p in base.iterdir() if p.is_dir()), reverse=True):
+            try:
+                items.append(WorkbenchRun.open(root, directory.name).summary())
+            except (FileNotFoundError, ValueError, OSError):
+                continue
+    return {"runs": items[: max(0, int(limit))]}
 
 
 def main() -> None:

@@ -33,6 +33,11 @@ EXPECTED_TOOLS = {
     "list_modules",
     "describe_module",
     "run_module",
+    "workbench_plan",
+    "workbench_run",
+    "workbench_resume",
+    "workbench_status",
+    "workbench_list",
 }
 
 
@@ -166,6 +171,19 @@ def main(argv: list[str] | None = None) -> int:
             failures.append("默认应拒绝执行，却已执行")
         if "白名单" not in guard.get("reason", ""):
             failures.append(f"拒绝原因未说明白名单：{guard.get('reason')}")
+
+        workbench = _call(proc, 10, "workbench_run", {"query": "设计自动化工作台路由"})
+        print(f"[workbench_run] status={workbench.get('status')} run_id={workbench.get('run_id')}")
+        if workbench.get("status") != "DONE" or not workbench.get("run_id"):
+            failures.append(f"workbench_run 未完成只读流程：{workbench}")
+        run_id = workbench.get("run_id")
+        if run_id:
+            status = _call(proc, 11, "workbench_status", {"run_id": run_id})
+            if status.get("run_id") != run_id:
+                failures.append(f"workbench_status run_id 不符：{status}")
+            listed = _call(proc, 12, "workbench_list", {"limit": 5})
+            if not any(item.get("run_id") == run_id for item in listed.get("runs", [])):
+                failures.append("workbench_list 未返回刚创建的运行")
     except (RuntimeError, json.JSONDecodeError, KeyError, IndexError) as exc:
         # 服务器中途死掉时，裸异常是「服务器提前关闭」，看不出为什么——
         # 而这正是这条门禁最需要说清楚的一种失败（SDK 版本不兼容就在这一类）。
