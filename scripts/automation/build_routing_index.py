@@ -41,7 +41,9 @@ def main() -> int:
         return 1 if problems else 0
 
     target = write_index(root, Path(args.output) if args.output else None)
-    print(f"已写入 {target}")
+    # Keep the normal success line ASCII-only: GitHub Windows runners may expose
+    # cp1252 stdout, which cannot encode the Chinese status text.
+    print(f"Wrote {target}")
     return 0
 
 
