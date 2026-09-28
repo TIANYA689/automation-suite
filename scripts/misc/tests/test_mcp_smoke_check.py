@@ -87,6 +87,11 @@ class CiWiringTests(unittest.TestCase):
     def test_ci_installs_routing_requirements(self) -> None:
         self.assertIn("scripts/automation/routing/requirements.txt", self._workflow())
 
+    def test_routing_requirements_are_legacy_pip_decodable(self) -> None:
+        """Python 3.11 runners may use GBK as the locale encoding for pip 24."""
+        requirements = ROOT / "scripts" / "automation" / "routing" / "requirements.txt"
+        requirements.read_bytes().decode("ascii")
+
     def test_ci_requires_mcp(self) -> None:
         lines = [line for line in self._workflow().splitlines() if "mcp_smoke_check.py" in line]
         self.assertTrue(lines, "CI 未调用 mcp_smoke_check.py")
