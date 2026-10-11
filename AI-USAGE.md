@@ -89,6 +89,8 @@ python scripts/misc/check_projects.py --rebuild-index
 python scripts/misc/ai_finding.py add --kind path --area js-reverse --title "..." --trigger "..." --detail "..."
 python scripts/misc/ai_finding.py search "混淆 字符串数组"
 python scripts/misc/ai_finding.py validate
+# 外部 GitHub 来源清单的离线 schema/固定版本/许可证占位检查（不联网）
+python scripts/misc/check_upstream_sources.py
 # 注册 MCP 到 WorkBuddy / Claude Code / Codex（默认 dry-run，--write 才落盘）
 python scripts/misc/install_router_mcp.py
 # MCP 服务器 stdio 冒烟检查

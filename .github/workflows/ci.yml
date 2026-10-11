@@ -70,6 +70,9 @@ jobs:
       - name: Findings library validation
         run: python scripts/misc/ai_finding.py validate
 
+      - name: Upstream source manifest check
+        run: python scripts/misc/check_upstream_sources.py
+
       - name: Install module test dependencies
         shell: bash
         run: |

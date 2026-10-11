@@ -60,6 +60,7 @@ python scripts/misc/check_index.py             # 索引完备性
 python scripts/misc/check_budget.py            # 文档与单文件体量预算
 python scripts/misc/check_tool_inventory.py    # MCP 工具清单一致性
 python scripts/misc/ai_finding.py validate     # 可复用发现库校验
+python scripts/misc/check_upstream_sources.py # 外部来源清单离线校验
 ```
 
 前四项与最后一项是"内容对不对"，中间六项是"文档有没有说谎"：
@@ -99,6 +100,7 @@ python scripts/misc/run_ci_checks.py --as-ci # 在 git clone 出来的目录里�
 | [`AGENTS.md`](AGENTS.md) | 代理运行时契约：会话启动、硬性约束、完成标准 |
 | [`SKILLS.md`](SKILLS.md) | 技能索引：触发信号与产物 |
 | [`docs/upstream-absorption.md`](docs/upstream-absorption.md) | 上游吸收台账：吸收了什么、剔除了什么、理由 |
+| [`docs/upstream-sources.json`](docs/upstream-sources.json) | 外部来源固定版本、许可证状态与复核记录 |
 | [`docs/public-release.md`](docs/public-release.md) | 公开发布检查清单 |
 
 ## 目录结构

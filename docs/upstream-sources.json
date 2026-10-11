@@ -1,0 +1,61 @@
+{
+  "version": "1.0",
+  "sources": [
+    {
+      "id": "hello-js-reverse-skill",
+      "url": "https://github.com/WhiteNightShadow/hello_js_reverse_skill",
+      "revision": "ec3cc389c1c0a383e158dbfd4b20531e5fae748d",
+      "spdx_license": "LicenseRef-NOASSERTION",
+      "checked_at": "2026-10-01",
+      "scope": "methodology only; no source code copied; GitHub API reported NOASSERTION; archived=false"
+    },
+    {
+      "id": "open-reverselab",
+      "url": "https://github.com/LING71671/open-reverselab",
+      "revision": "e44c351032b2530c926b2aea224276bbee591b16",
+      "spdx_license": "GPL-3.0-only",
+      "checked_at": "2026-10-01",
+      "scope": "engineering patterns only; no source code copied; GitHub API reported GPL-3.0; archived=false"
+    },
+    {
+      "id": "reverse-skills",
+      "url": "https://github.com/P4nda0s/reverse-skills",
+      "revision": "a2baa31c58a3567977188414da68c8c842057152",
+      "spdx_license": "LicenseRef-NOASSERTION",
+      "checked_at": "2026-10-11",
+      "scope": "symbol/struct recovery and emulation methodology only; no source code copied; prebuilt binaries excluded; GitHub API reported NOASSERTION; archived=false"
+    },
+    {
+      "id": "codex-keysmith",
+      "url": "https://github.com/Jia-Ethan/codex-keysmith",
+      "revision": "cfcd96eb727c324ee8649170c43aaa632ff53cb3",
+      "spdx_license": "MIT",
+      "checked_at": "2026-10-11",
+      "scope": "evaluation engineering only; all jailbreak payloads and scoring criteria excluded; no source code copied; GitHub API reported MIT; archived=false"
+    },
+    {
+      "id": "cc-unlock",
+      "url": "https://github.com/JacksonTai2007/cc-unlock",
+      "revision": "1b263f0a935def2e21341059bef3d04d5af6cd77",
+      "spdx_license": "MIT",
+      "checked_at": "2026-10-11",
+      "scope": "memory-pack structure and rollback patterns only; content-layer semantics excluded; no source code copied; GitHub API reported MIT; archived=false"
+    },
+    {
+      "id": "internal-safety-collapse",
+      "url": "https://github.com/wuyoscar/Internal-Safety-Collapse",
+      "revision": "52b9396cfb46128e51986d8fd7cd674048e7a5ad",
+      "spdx_license": "LicenseRef-NOASSERTION",
+      "checked_at": "2026-10-11",
+      "scope": "evaluated and fully excluded; no content absorbed; GitHub API reported NOASSERTION; archived=false"
+    },
+    {
+      "id": "apk-reverse",
+      "url": "https://github.com/newliver666/apk-reverse",
+      "revision": "7b6c6932a95f03d778e81e5e1a2cbf6f62dc97fd",
+      "spdx_license": "MIT",
+      "checked_at": "2026-10-11",
+      "scope": "documentation-truth validators and android structure facts only; security-bypass content and all upstream scripts excluded; no source code copied; GitHub API reported MIT; archived=false"
+    }
+  ]
+}

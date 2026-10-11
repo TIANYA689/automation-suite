@@ -60,6 +60,15 @@
       ],
       "files": ["06-symptom-index-and-capability-matrix.md"],
       "priority": 9
+    },
+    {
+      "id": "external-source-audit",
+      "signals": [
+        "GitHub 调研", "上游来源", "来源审计", "许可证复核", "固定 commit", "固定版本",
+        "知识库优化", "知识库审查", "知识漂移审查", "来源追溯", "上游吸收"
+      ],
+      "files": ["07-external-source-audit.md"],
+      "priority": 10
     }
   ]
 }
