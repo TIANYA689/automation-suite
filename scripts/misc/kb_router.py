@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -32,6 +33,12 @@ from automation.routing.kb_index import TOP_K, load_kb_indexes  # noqa: E402
 
 
 def main() -> int:
+    # Windows 默认 GBK 无法编码核验符号；CLI 输出必须在常见终端稳定可读。
+    if hasattr(sys.stdout, "reconfigure"):
+        try:
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        except (OSError, ValueError):
+            pass
     parser = argparse.ArgumentParser(description="知识库信号路由（只读）")
     parser.add_argument("query", nargs="?", help="需求文本")
     parser.add_argument("--json", action="store_true", help="输出 JSON")
@@ -77,7 +84,7 @@ def main() -> int:
         for record in item.get("files_exist", [{"path": p} for p in item["files"]]):
             mark = ""
             if args.verify:
-                mark = " ✓" if record.get("exists") else " ✗"
+                mark = " [OK]" if record.get("exists") else " [MISSING]"
             print(f"     {record['path']}{mark}")
         matched = ", ".join(hit["value"] for hit in item["evidence"] if hit["type"] == "signal")
         if matched:

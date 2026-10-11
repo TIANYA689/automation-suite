@@ -15,8 +15,11 @@
 from __future__ import annotations
 
 import argparse
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from contextlib import contextmanager
 import hashlib
 import json
+import os
 import re
 import sys
 import uuid
@@ -41,8 +44,11 @@ from automation.routing import (  # noqa: E402
 
 SCHEMA_VERSION = 1
 WORKBENCH_ROOT = Path("exports") / "automation" / "workbench"
+MAX_DESCRIBE_WORKERS = 8
 RUN_ID_RE = re.compile(r"^[a-z0-9][a-z0-9._-]{2,95}$")
 SLUG_RE = re.compile(r"[^a-z0-9]+")
+MAX_QUERY_CHARS = 16_000
+MAX_TOP_K = 50
 
 
 def utc_now() -> str:
@@ -58,9 +64,40 @@ def slugify(text: str) -> str:
 
 
 def _safe_run_id(run_id: str) -> str:
+    if not isinstance(run_id, str):
+        raise ValueError("run_id 必须是字符串")
     if not RUN_ID_RE.fullmatch(run_id):
         raise ValueError("run_id 只能包含小写字母、数字、点、下划线和连字符")
     return run_id
+
+
+def _validate_query(query: str) -> str:
+    if not isinstance(query, str):
+        raise ValueError("query 必须是字符串")
+    query = query.strip()
+    if not query:
+        raise ValueError("query 不能为空")
+    if len(query) > MAX_QUERY_CHARS:
+        raise ValueError(f"query 超过最大长度 {MAX_QUERY_CHARS}")
+    return query
+
+
+def _validate_top_k(top_k: int) -> int:
+    if isinstance(top_k, bool) or not isinstance(top_k, int):
+        raise ValueError("top_k 必须是整数")
+    if not 1 <= top_k <= MAX_TOP_K:
+        raise ValueError(f"top_k 必须在 1 到 {MAX_TOP_K} 之间")
+    return top_k
+
+
+def _safe_child(root: Path, relative: Path) -> Path:
+    """Return a child path while preventing symlink/path traversal escapes."""
+    candidate = (root / relative).resolve()
+    try:
+        candidate.relative_to(root)
+    except ValueError as exc:
+        raise ValueError("工作台产物路径超出项目根目录") from exc
+    return candidate
 
 
 def _write_json(path: Path, payload: dict[str, Any]) -> None:
@@ -95,8 +132,8 @@ def _module_names(route_result: dict[str, Any]) -> list[str]:
 
 def build_plan(root: Path, query: str, top_k: int = 5) -> dict[str, Any]:
     """执行计划阶段的所有只读步骤，并返回完整的 Agent 消费协议。"""
-    if not query or not query.strip():
-        raise ValueError("query 不能为空")
+    query = _validate_query(query)
+    top_k = _validate_top_k(top_k)
     root = Path(root).resolve()
     index = build_index(root)
     route_result = route(query, index, top_k=top_k)
@@ -157,10 +194,11 @@ class WorkbenchRun:
     def __init__(self, root: Path, run_id: str):
         self.root = Path(root).resolve()
         self.run_id = _safe_run_id(run_id)
-        self.directory = self.root / WORKBENCH_ROOT / self.run_id
+        self.directory = _safe_child(self.root, WORKBENCH_ROOT / self.run_id)
         self.plan_path = self.directory / "plan.json"
         self.state_path = self.directory / "state.json"
         self.events_path = self.directory / "events.jsonl"
+        self.lock_path = self.directory / ".run.lock"
 
     @classmethod
     def create(cls, root: Path, query: str, top_k: int = 5) -> "WorkbenchRun":
@@ -200,16 +238,57 @@ class WorkbenchRun:
         return instance
 
     def read_plan(self) -> dict[str, Any]:
-        return json.loads(self.plan_path.read_text(encoding="utf-8"))
+        payload = json.loads(self.plan_path.read_text(encoding="utf-8"))
+        if not isinstance(payload, dict) or payload.get("schema_version") != SCHEMA_VERSION:
+            raise ValueError("plan.json schema_version 无效")
+        if not isinstance(payload.get("actions"), list):
+            raise ValueError("plan.json actions 必须是数组")
+        return payload
 
     def read_state(self) -> dict[str, Any]:
-        return json.loads(self.state_path.read_text(encoding="utf-8"))
+        payload = json.loads(self.state_path.read_text(encoding="utf-8"))
+        if not isinstance(payload, dict) or payload.get("schema_version") != SCHEMA_VERSION:
+            raise ValueError("state.json schema_version 无效")
+        return payload
 
     def event(self, name: str, data: dict[str, Any] | None = None) -> None:
         _append_jsonl(
             self.events_path,
             {"ts": utc_now(), "run_id": self.run_id, "event": name, "data": data or {}},
         )
+
+    @contextmanager
+    def _lock(self):
+        """Serialize mutations for one run across threads/processes."""
+        self.lock_path.parent.mkdir(parents=True, exist_ok=True)
+        handle = self.lock_path.open("a+b")
+        try:
+            if os.name == "nt":
+                import msvcrt
+
+                handle.seek(0)
+                handle.write(b"0")
+                handle.flush()
+                handle.seek(0)
+                msvcrt.locking(handle.fileno(), msvcrt.LK_LOCK, 1)
+            else:
+                import fcntl
+
+                fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+            yield
+        finally:
+            try:
+                if os.name == "nt":
+                    import msvcrt
+
+                    handle.seek(0)
+                    msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+                else:
+                    import fcntl
+
+                    fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+            finally:
+                handle.close()
 
     def _save(self, plan: dict[str, Any], state: dict[str, Any]) -> None:
         state["updated_at"] = utc_now()
@@ -222,6 +301,10 @@ class WorkbenchRun:
         _write_json(self.state_path, state)
 
     def advance(self, execute: bool = False, modules: list[str] | None = None) -> dict[str, Any]:
+        with self._lock():
+            return self._advance_locked(execute=execute, modules=modules)
+
+    def _advance_locked(self, execute: bool = False, modules: list[str] | None = None) -> dict[str, Any]:
         """推进所有只读动作；只有显式 modules 才会加入模块运行动作。"""
         plan = self.read_plan()
         state = self.read_state()
@@ -240,26 +323,53 @@ class WorkbenchRun:
 
         state["status"] = "RUNNING"
         state["error"] = None
+        pending_descriptions = [
+            action for action in plan["actions"]
+            if action["status"] == "pending" and action["kind"] == "describe_module"
+        ]
+
+        def describe(action: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any] | None, Exception | None]:
+            try:
+                return action, describe_module(action["module"], index, self.root, max_chars=4000), None
+            except (KeyError, OSError, ValueError) as exc:
+                return action, None, exc
+
+        # 描述动作只读且相互独立；集中在主线程落盘，避免 plan/events 并发写竞争。
+        if len(pending_descriptions) > 1:
+            workers = min(MAX_DESCRIBE_WORKERS, len(pending_descriptions))
+            with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="workbench") as pool:
+                description_results = [future.result() for future in as_completed(
+                    [pool.submit(describe, action) for action in pending_descriptions]
+                )]
+        else:
+            description_results = [describe(action) for action in pending_descriptions]
+
+        for action, detail, error in description_results:
+            if error is not None:
+                action["status"] = "failed"
+                action["reason"] = str(error)
+                state["error"] = str(error)
+                self.event("action_failed", {"action": action["id"], "error": str(error)})
+                continue
+            target = _safe_child(self.root, self.directory.relative_to(self.root) / "modules" / f"{slugify(action['module'])}.json")
+            _write_json(target, detail or {})
+            action["status"] = "done"
+            action["result"] = str(target.relative_to(self.root).as_posix())
+            self.event("module_described", {"module": action["module"], "path": action["result"]})
+
         for action in plan["actions"]:
             if action["status"] != "pending":
                 continue
             kind = action["kind"]
             try:
-                if kind == "describe_module":
-                    detail = describe_module(action["module"], index, self.root, max_chars=4000)
-                    target = self.directory / "modules" / f"{slugify(action['module'])}.json"
-                    _write_json(target, detail)
-                    action["status"] = "done"
-                    action["result"] = str(target.relative_to(self.root).as_posix())
-                    self.event("module_described", {"module": action["module"], "path": action["result"]})
-                elif kind == "run_module":
+                if kind == "run_module":
                     result = run_module(
                         action["module"],
                         index,
                         self.root,
                         dry_run=not execute,
                     )
-                    target = self.directory / "modules" / f"{slugify(action['module'])}-run.json"
+                    target = _safe_child(self.root, self.directory.relative_to(self.root) / "modules" / f"{slugify(action['module'])}-run.json")
                     _write_json(target, result)
                     if not result.get("allowed"):
                         action["status"] = "blocked"

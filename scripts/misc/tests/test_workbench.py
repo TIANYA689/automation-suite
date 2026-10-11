@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import threading
 import shutil
 import sys
 import tempfile
@@ -56,6 +57,19 @@ class WorkbenchTests(unittest.TestCase):
         state = json.loads((resumed.directory / "state.json").read_text(encoding="utf-8"))
         self.assertEqual(state["pending_actions"], [])
 
+    def test_multiple_describe_actions_are_completed_and_persisted(self) -> None:
+        run = WorkbenchRun.create(self.root, "设计自动化工作台路由")
+        plan = json.loads(run.plan_path.read_text(encoding="utf-8"))
+        plan["actions"].extend([
+            {"id": "describe:extra-a", "kind": "describe_module", "status": "pending", "module": "missing-a"},
+            {"id": "describe:extra-b", "kind": "describe_module", "status": "pending", "module": "missing-b"},
+        ])
+        run.plan_path.write_text(json.dumps(plan, ensure_ascii=False), encoding="utf-8")
+        result = run.advance()
+        self.assertEqual(result["status"], "FAILED")
+        self.assertIn("describe:extra-a", result["failed_actions"])
+        self.assertIn("describe:extra-b", result["failed_actions"])
+
     def test_unrouted_query_never_becomes_executable(self) -> None:
         run = WorkbenchRun.create(self.root, "今天天气怎么样")
         result = run.advance()
@@ -98,6 +112,55 @@ class WorkbenchTests(unittest.TestCase):
         result = run.advance(execute=True, modules=["failing"])
         self.assertEqual(result["status"], "FAILED")
         self.assertEqual(result["failed_actions"], ["run:failing"])
+
+    def test_rejects_invalid_query_and_top_k(self) -> None:
+        with self.assertRaises(ValueError):
+            build_plan(self.root, "   ")
+        with self.assertRaises(ValueError):
+            build_plan(self.root, "x", top_k=0)
+        with self.assertRaises(ValueError):
+            build_plan(self.root, "x", top_k=51)
+        with self.assertRaises(ValueError):
+            build_plan(self.root, "x" * 16_001)
+
+    def test_rejects_path_traversal_run_id(self) -> None:
+        with self.assertRaises(ValueError):
+            WorkbenchRun(self.root, "../escape")
+
+    def test_rejects_invalid_plan_schema(self) -> None:
+        run = WorkbenchRun.create(self.root, "设计自动化工作台路由")
+        plan = json.loads(run.plan_path.read_text(encoding="utf-8"))
+        plan["schema_version"] = 999
+        run.plan_path.write_text(json.dumps(plan), encoding="utf-8")
+        with self.assertRaises(ValueError):
+            run.read_plan()
+
+    def test_run_lock_serializes_concurrent_advances(self) -> None:
+        run = WorkbenchRun.create(self.root, "设计自动化工作台路由")
+        entered = threading.Event()
+        release = threading.Event()
+        second_entered = threading.Event()
+
+        def hold_lock() -> None:
+            with run._lock():
+                entered.set()
+                release.wait(timeout=3)
+
+        def wait_for_lock() -> None:
+            entered.wait(timeout=3)
+            with run._lock():
+                second_entered.set()
+
+        first = threading.Thread(target=hold_lock)
+        second = threading.Thread(target=wait_for_lock)
+        first.start()
+        self.assertTrue(entered.wait(timeout=3))
+        second.start()
+        self.assertFalse(second_entered.wait(timeout=0.1))
+        release.set()
+        first.join(timeout=3)
+        second.join(timeout=3)
+        self.assertTrue(second_entered.is_set())
 
 
 if __name__ == "__main__":

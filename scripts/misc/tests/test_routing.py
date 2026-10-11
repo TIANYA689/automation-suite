@@ -60,6 +60,14 @@ class TestIndexBuilder(unittest.TestCase):
         again = build_index(self.root)
         self.assertEqual(self.index["fingerprint"], again["fingerprint"])
 
+    def test_module_scan_is_sorted_and_complete(self) -> None:
+        modules = self.index["modules"]
+        self.assertEqual(
+            [(item["category"], item["name"]) for item in modules],
+            sorted((item["category"], item["name"]) for item in modules),
+        )
+        self.assertTrue(all("entries" in item and "signals" in item for item in modules))
+
     def test_architect_is_router_role(self) -> None:
         by_name = {s["name"]: s for s in self.index["skills"]}
         self.assertEqual(by_name["automation-architect"]["role"], "router")

@@ -14,6 +14,7 @@ import hashlib
 import json
 import re
 import unicodedata
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -184,35 +185,41 @@ def scan_modules(root: Path, source: dict[str, Any]) -> tuple[list[dict[str, Any
     declared_categories = source.get("module_categories", {})
     modules: list[dict[str, Any]] = []
 
-    for category_dir in sorted(p for p in modules_root.iterdir() if p.is_dir()):
-        category = category_dir.name
-        for module_dir in sorted(p for p in category_dir.iterdir() if p.is_dir()):
-            entries: list[str] = []
-            readme = ""
-            requirements = ""
-            for file in sorted(module_dir.rglob("*")):
-                if not file.is_file():
-                    continue
-                if NOISE_DIRS & set(file.parts):
-                    continue
-                rel = str(file.relative_to(root)).replace("\\", "/")
-                if file.name.lower().startswith("readme"):
-                    readme = readme or rel
-                elif file.name == "requirements.txt":
-                    requirements = requirements or rel
-                elif file.suffix.lower() in ENTRY_SUFFIXES:
-                    entries.append(rel)
-            modules.append(
-                {
-                    "category": category,
-                    "name": module_dir.name,
-                    "path": str(module_dir.relative_to(root)).replace("\\", "/"),
-                    "readme": readme,
-                    "requirements": requirements,
-                    "entries": entries,
-                    "signals": _as_list(declared_categories.get(category, {}).get("signals")),
-                }
-            )
+    def scan_one(item: tuple[Path, str]) -> dict[str, Any]:
+        module_dir, category = item
+        entries: list[str] = []
+        readme = ""
+        requirements = ""
+        for file in sorted(module_dir.rglob("*")):
+            if not file.is_file() or NOISE_DIRS & set(file.parts):
+                continue
+            rel = str(file.relative_to(root)).replace("\\", "/")
+            if file.name.lower().startswith("readme"):
+                readme = readme or rel
+            elif file.name == "requirements.txt":
+                requirements = requirements or rel
+            elif file.suffix.lower() in ENTRY_SUFFIXES:
+                entries.append(rel)
+        return {
+            "category": category,
+            "name": module_dir.name,
+            "path": str(module_dir.relative_to(root)).replace("\\", "/"),
+            "readme": readme,
+            "requirements": requirements,
+            "entries": entries,
+            "signals": _as_list(declared_categories.get(category, {}).get("signals")),
+        }
+
+    work = [
+        (module_dir, category_dir.name)
+        for category_dir in sorted(p for p in modules_root.iterdir() if p.is_dir())
+        for module_dir in sorted(p for p in category_dir.iterdir() if p.is_dir())
+    ]
+    if len(work) > 1:
+        with ThreadPoolExecutor(max_workers=min(8, len(work)), thread_name_prefix="routing-scan") as pool:
+            modules = list(pool.map(scan_one, work))
+    else:
+        modules = [scan_one(item) for item in work]
 
     on_disk = {p.name for p in modules_root.iterdir() if p.is_dir()}
     undeclared_categories = sorted(on_disk - set(declared_categories))
