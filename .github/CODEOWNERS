@@ -1,0 +1,7 @@
+# 维护者指派。语法：<pattern> <owner>
+# 这些目录承载技能、知识库、门禁脚本与 GitHub 治理配置，变更需维护者复核。
+
+skills/    @wuyingzhishang
+kb/        @wuyingzhishang
+scripts/   @wuyingzhishang
+.github/   @wuyingzhishang

@@ -1,0 +1,34 @@
+name: Release Check
+
+# 只在人工打 tag（v*）后运行：生成只读检查报告，不自动发布任何未知产物。
+# 没有 gh release create / upload-release-asset 之类的发布步骤——
+# 发布由人工确认后手动执行，这里只回答"这个 tag 的提交是否仍通过公开释放门禁"。
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: windows-latest
+    env:
+      PYTHONIOENCODING: utf-8
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      # 只读检查：确认打 tag 的提交没有混入不该发布的文件、路径或密钥。
+      - name: Public release check
+        run: python scripts/misc/public_release_check.py
+
+      # 文档交叉引用可达性：确保 tag 提交里的文档引用全部真实存在。
+      - name: Cross-reference check
+        run: python scripts/misc/check_doc_refs.py

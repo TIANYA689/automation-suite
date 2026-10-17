@@ -1,1 +1,8 @@
-blank_issues_enabled: true
+# 禁用空 Issue：本项目涉及自动化、验证码、账号与样本分析，
+# 空 Issue 会绕过授权边界、脱敏与复现信息收集。
+blank_issues_enabled: false
+contact_links:
+  # 安全漏洞或授权边界问题走私密通道，不要在公开 Issue 里贴复现细节或样本。
+  - name: 私密安全通告
+    url: https://github.com/wuyingzhishang/automation-suite/security/advisories/new
+    about: 报告安全漏洞、授权越界或敏感样本，请走私密通告，不要开公开 Issue。

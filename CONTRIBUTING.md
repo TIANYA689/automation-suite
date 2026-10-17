@@ -15,8 +15,17 @@
 python scripts/misc/public_release_check.py
 ```
 
+## 外部来源登记
+
+借鉴外部 GitHub 仓库时，必须登记来源，并写进 [`docs/upstream-absorption.md`](docs/upstream-absorption.md)：
+
+- 记录仓库 `owner/repo`、固定 commit SHA、许可证（SPDX）与吸收范围（scope）。
+- 坚持「只借鉴设计，不复制实现」：外部仓库的实现代码一律重写，避免许可污染。
+- 新增来源后同步登记 `docs/upstream-sources.json`，并用 `python scripts/misc/check_upstream_sources.py` 校验清单。
+
 ## Pull Request 建议
 
 - 说明问题、解决方案和验证命令。
 - 对安全敏感能力写清楚授权边界。
 - 保持变更聚焦，避免把格式化、重命名和功能变更混在一个 PR。
+- 借鉴了外部仓库时，按上节完成外部来源登记并在 PR 模板中勾选声明。

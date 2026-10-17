@@ -1,0 +1,12 @@
+# 依赖更新：只开 GitHub Actions 与 Python 依赖两类。
+# 先提 PR 人工复核，不做自动合并（见 reports/automation/github-kb-optimization-audit.md 的 P3）。
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
