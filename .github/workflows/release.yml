@@ -21,7 +21,7 @@ jobs:
       # 默认浅克隆（depth=1）只会看到 1 个 commit，扫完照样输出「没有泄漏」——
       # 那不是通过，是没扫。判据的执行面必须真的执行。
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
