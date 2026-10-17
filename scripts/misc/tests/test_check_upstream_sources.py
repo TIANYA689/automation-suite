@@ -1,12 +1,16 @@
-"""Tests for the offline external-source manifest validator."""
+"""Tests for the external-source manifest validator (offline plus mocked network)."""
 
 from __future__ import annotations
 
+import contextlib
+import io
 import json
 import sys
 import tempfile
 import unittest
+from datetime import date
 from pathlib import Path
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -64,6 +68,277 @@ class SourceManifestTests(unittest.TestCase):
         report = checker.validate(self.path)
         self.assertFalse(report["ok"])
         self.assertEqual(report["sources"], 0)
+
+
+class NetworkCheckTests(unittest.TestCase):
+    """联网核验的行为，全部通过替换 ``_fetch_json`` 模拟，绝不访问真实网络。
+
+    每个用例都断言 ``calls``，确保测试本身没有偷偷发起请求；默认模式则要求
+    ``calls`` 严格为 0。
+    """
+
+    BASE = "https://api.github.com/repos/org/repo"
+    REVISION = "a" * 40
+    HEAD = "b" * 40
+
+    def setUp(self) -> None:
+        self.temp = tempfile.TemporaryDirectory()
+        self.path = Path(self.temp.name) / "sources.json"
+        self.calls: list[str] = []
+
+    def tearDown(self) -> None:
+        self.temp.cleanup()
+
+    def write(self, records: list[dict[str, str]]) -> None:
+        self.path.write_text(
+            json.dumps({"version": "1.0", "sources": records}), encoding="utf-8"
+        )
+
+    def record(self, **overrides: str) -> dict[str, str]:
+        item = {
+            "id": "sample",
+            "url": "https://github.com/org/repo",
+            "revision": self.REVISION,
+            "spdx_license": "MIT",
+            "checked_at": date.today().isoformat(),
+            "scope": "methodology only",
+        }
+        item.update(overrides)
+        return item
+
+    def routes(self, **overrides: object) -> dict[str, object]:
+        """默认：仓库存在、MIT、revision 存在、HEAD 未漂移。"""
+        values: dict[str, object] = {
+            self.BASE: {"archived": False, "license": {"spdx_id": "MIT"}},
+            f"{self.BASE}/commits/{self.REVISION}": {"sha": self.REVISION},
+            f"{self.BASE}/commits?per_page=1": [{"sha": self.REVISION}],
+        }
+        values.update(overrides)
+        return values
+
+    def fetcher(self, values: dict[str, object]):
+        def fake(url: str, timeout: float) -> object:
+            self.calls.append(url)
+            value = values.get(url)
+            if isinstance(value, Exception):
+                raise value
+            if value is None:
+                raise checker.FetchError(
+                    "GitHub API 返回 HTTP 404：Not Found", url=url, status=404
+                )
+            return value
+
+        return fake
+
+    def run_network(
+        self, values: dict[str, object], *extra: str
+    ) -> tuple[int, dict[str, object]]:
+        buffer = io.StringIO()
+        with patch.object(checker, "_fetch_json", self.fetcher(values)):
+            with contextlib.redirect_stdout(buffer):
+                code = checker.main(
+                    [
+                        "--network",
+                        "--json",
+                        "--manifest",
+                        str(self.path),
+                        "--skip-ledger",
+                        *extra,
+                    ]
+                )
+        return code, json.loads(buffer.getvalue())
+
+    @staticmethod
+    def findings(report: dict[str, object], code: str) -> list[dict[str, str]]:
+        return [
+            item
+            for item in report["findings"]  # type: ignore[index]
+            if item["code"] == code
+        ]
+
+    def test_offline_mode_never_calls_fetch(self) -> None:
+        """默认路径必须保持纯离线：一次 fetch 都不允许发生。"""
+        self.write([self.record()])
+        buffer = io.StringIO()
+        with patch.object(checker, "_fetch_json", self.fetcher(self.routes())):
+            with contextlib.redirect_stdout(buffer):
+                code = checker.main(
+                    ["--manifest", str(self.path), "--skip-ledger"]
+                )
+        self.assertEqual(code, 0)
+        self.assertEqual(self.calls, [])
+        self.assertTrue(json.loads(buffer.getvalue())["ok"])
+
+    def test_missing_repository_is_an_error(self) -> None:
+        self.write([self.record()])
+        code, report = self.run_network(
+            self.routes(
+                **{
+                    self.BASE: checker.FetchError(
+                        "GitHub API 返回 HTTP 404：Not Found", status=404
+                    )
+                }
+            )
+        )
+        self.assertEqual(code, 1)
+        self.assertFalse(report["ok"])
+        found = self.findings(report, "repo-missing")
+        self.assertEqual(len(found), 1)
+        self.assertIn("不存在", found[0]["message"])
+        # 仓库都不存在时，不应继续请求 commits。
+        self.assertEqual(len(self.calls), 1)
+
+    def test_archived_repository_is_a_warning(self) -> None:
+        self.write([self.record()])
+        code, report = self.run_network(
+            self.routes(
+                **{
+                    self.BASE: {
+                        "archived": True,
+                        "license": {"spdx_id": "MIT"},
+                    }
+                }
+            )
+        )
+        self.assertEqual(code, 0)
+        self.assertEqual(report["counts"]["warning"], 1)  # type: ignore[index]
+        found = self.findings(report, "archived")
+        self.assertEqual(len(found), 1)
+        self.assertEqual(found[0]["severity"], "warning")
+
+    def test_license_mismatch_is_an_error(self) -> None:
+        self.write([self.record(spdx_license="Apache-2.0")])
+        code, report = self.run_network(self.routes())
+        self.assertEqual(code, 1)
+        found = self.findings(report, "license-mismatch")
+        self.assertEqual(len(found), 1)
+        self.assertIn("许可证", found[0]["message"])
+
+    def test_noassertion_matches_manifest_noassertion(self) -> None:
+        """上游本来就没声明许可证，不能误报成许可证变化。"""
+        self.write([self.record(spdx_license="LicenseRef-NOASSERTION")])
+        code, report = self.run_network(
+            self.routes(
+                **{
+                    self.BASE: {
+                        "archived": False,
+                        "license": {"spdx_id": "NOASSERTION"},
+                    }
+                }
+            )
+        )
+        self.assertEqual(code, 0, report["findings"])
+        self.assertEqual(self.findings(report, "license-mismatch"), [])
+
+    def test_null_license_matches_manifest_noassertion(self) -> None:
+        self.write([self.record(spdx_license="LicenseRef-NOASSERTION")])
+        code, report = self.run_network(
+            self.routes(**{self.BASE: {"archived": False, "license": None}})
+        )
+        self.assertEqual(code, 0, report["findings"])
+
+    def test_github_gpl_alias_matches_pinned_license(self) -> None:
+        """GitHub 常把 GPL-3.0-only 报成 GPL-3.0，不应误报。"""
+        self.write([self.record(spdx_license="GPL-3.0-only")])
+        code, report = self.run_network(
+            self.routes(
+                **{
+                    self.BASE: {
+                        "archived": False,
+                        "license": {"spdx_id": "GPL-3.0"},
+                    }
+                }
+            )
+        )
+        self.assertEqual(code, 0, report["findings"])
+
+    def test_missing_revision_is_an_error(self) -> None:
+        self.write([self.record()])
+        code, report = self.run_network(
+            self.routes(
+                **{
+                    f"{self.BASE}/commits/{self.REVISION}": checker.FetchError(
+                        "GitHub API 返回 HTTP 404：Not Found", status=404
+                    )
+                }
+            )
+        )
+        self.assertEqual(code, 1)
+        found = self.findings(report, "revision-missing")
+        self.assertEqual(len(found), 1)
+        self.assertIn("revision", found[0]["message"])
+
+    def test_head_drift_is_info_and_does_not_fail(self) -> None:
+        self.write([self.record()])
+        code, report = self.run_network(
+            self.routes(**{f"{self.BASE}/commits?per_page=1": [{"sha": self.HEAD}]})
+        )
+        self.assertEqual(code, 0)
+        self.assertTrue(report["ok"])
+        found = self.findings(report, "head-drift")
+        self.assertEqual(len(found), 1)
+        self.assertEqual(found[0]["severity"], "info")
+        self.assertEqual(report["counts"]["error"], 0)  # type: ignore[index]
+
+    def test_rate_limit_is_a_clear_error(self) -> None:
+        self.write([self.record()])
+        code, report = self.run_network(
+            self.routes(
+                **{
+                    self.BASE: checker.FetchError(
+                        "GitHub API 限流（rate limit），配额重置时间：2026-10-17 12:00:00 UTC",
+                        status=403,
+                        rate_limited=True,
+                    )
+                }
+            )
+        )
+        self.assertEqual(code, 1)
+        messages = [item["message"] for item in report["findings"]]  # type: ignore[index]
+        self.assertTrue(
+            any("限流" in message or "rate limit" in message for message in messages),
+            messages,
+        )
+
+    def test_network_failure_is_an_error(self) -> None:
+        self.write([self.record()])
+        code, report = self.run_network(
+            self.routes(
+                **{
+                    self.BASE: checker.FetchError(
+                        "网络不可达或请求超时：timed out"
+                    )
+                }
+            )
+        )
+        self.assertEqual(code, 1)
+        self.assertEqual(len(self.findings(report, "repo-unreadable")), 1)
+
+    def test_stale_checked_at_is_a_warning(self) -> None:
+        self.write([self.record(checked_at="2020-01-01")])
+        code, report = self.run_network(self.routes())
+        self.assertEqual(code, 0)
+        found = self.findings(report, "stale")
+        self.assertEqual(len(found), 1)
+        self.assertEqual(found[0]["severity"], "warning")
+
+    def test_empty_manifest_fails_loudly(self) -> None:
+        """空清单不能输出「全部通过」，必须报错并非零退出。"""
+        self.write([])
+        code, report = self.run_network(self.routes())
+        self.assertEqual(code, 1)
+        self.assertEqual(report["checked"], 0)  # type: ignore[index]
+        self.assertEqual(len(self.findings(report, "empty-manifest")), 1)
+        self.assertEqual(self.calls, [])
+
+    def test_empty_commit_list_fails_loudly(self) -> None:
+        """API 返回 0 条结果同样不能当作通过。"""
+        self.write([self.record()])
+        code, report = self.run_network(
+            self.routes(**{f"{self.BASE}/commits?per_page=1": []})
+        )
+        self.assertEqual(code, 1)
+        self.assertEqual(len(self.findings(report, "empty-commits")), 1)
 
 
 class LedgerCoverageTests(unittest.TestCase):
