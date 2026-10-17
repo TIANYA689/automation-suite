@@ -146,6 +146,43 @@ RESERVED_EMAIL_DOMAINS = frozenset(
     {"example.com", "example.net", "example.org", "example.test"}
 )
 RESERVED_EMAIL_TLDS = (".test", ".invalid", ".localhost", ".local")
+# GitHub 的 noreply 中转域名，地址形如 `<id>+<user>@users.noreply.github.com`。
+#
+# 它不是 RFC 2606 保留域，所以不能塞进上面那个集合（那里的语义是「不可能属于真人」）。
+# 但按设计它就是**不暴露真人邮箱**的中转别名——把它当 PII 报，等于把已经脱敏过的
+# 地址当成泄漏，而真正需要报的真人邮箱反而被这条噪音淹没。
+RELAY_EMAIL_DOMAINS = frozenset({"users.noreply.github.com"})
+
+# 泄漏检测器**必然**包含它要抓的形态的字面量：正则里得写出盘符路径的字面量，夹具里得造
+# 假私钥头和非保留域邮箱。这是「判据必须能表达它要抓的东西」的必然代价，不是泄漏。
+#
+# 为什么不做成「占位识别」：夹具一旦换成 `example.com` 这类占位值，被测规则会因为
+# 占位判据被放行，**测试就退化成空测**——那比误报更糟（测试的形态假设成了它的盲区）。
+# 所以用显式豁免，并且范围钉死两处：
+#   1. 只豁免**检测器本身与它的测试**这两个文件，不是「所有测试文件」；
+#   2. 只豁免检测器必然要写出来的类型（路径 / 邮箱 / 私钥形态），
+#      手机号、身份证号这些与检测逻辑无关的类型**照常报**。
+# `test_public_release_check.py` 里有一条用例钉住这张表：要扩表就得同时改用例，
+# 改不动就说明这次豁免需要单独论证。
+SELF_DETECTION_EXEMPT: tuple[str, ...] = (
+    "scripts/misc/check_history_leaks.py",
+    "scripts/misc/tests/test_check_history_leaks.py",
+)
+SELF_DETECTION_KINDS = frozenset(
+    {
+        "hardcoded_d_git",
+        "windows_user_path",
+        "macos_user_path",
+        "generic_drive_path",
+        "pii_email",
+        "private_config",
+    }
+)
+
+
+def _is_self_detection(rel: str, kind: str) -> bool:
+    """该命中是否属于「检测器写出了它要抓的形态」这一必然情形。"""
+    return rel in SELF_DETECTION_EXEMPT and kind in SELF_DETECTION_KINDS
 # 明确**不是**真人邮箱的本地部分。
 #
 # 精确匹配，**不做子串**：本地部分里含 "test" 子串、但整体不等于 "test" 的地址
@@ -306,7 +343,11 @@ def _is_reserved_email_domain(domain: str) -> bool:
     `endswith("example.com")` 会把 `notexample.com` 一起放过——那是另一个域名，
     不是保留域。所以精确域名走相等，TLD 走「点 + 后缀」。
     """
-    return domain in RESERVED_EMAIL_DOMAINS or domain.endswith(RESERVED_EMAIL_TLDS)
+    return (
+        domain in RESERVED_EMAIL_DOMAINS
+        or domain in RELAY_EMAIL_DOMAINS
+        or domain.endswith(RESERVED_EMAIL_TLDS)
+    )
 
 
 def _looks_non_personal_email(address: str) -> bool:
@@ -417,12 +458,18 @@ def main() -> int:
                 path_hits.setdefault(m.start(), (name, m.group(0)))
         for start in sorted(path_hits):
             name, value = path_hits[start]
+            if _is_self_detection(rel, name):
+                continue
             line = text.count("\n", 0, start) + 1
             issues.append({"file": rel, "line": line, "type": name, "snippet": value[:120]})
         for start, snippet in find_private_config(text):
+            if _is_self_detection(rel, "private_config"):
+                continue
             line = text.count("\n", 0, start) + 1
             issues.append({"file": rel, "line": line, "type": "private_config", "snippet": snippet})
         for start, snippet, kind in find_pii(text):
+            if _is_self_detection(rel, kind):
+                continue
             line = text.count("\n", 0, start) + 1
             issues.append({"file": rel, "line": line, "type": kind, "snippet": snippet})
     # `scanned_files` 是刻意报出来的：这条检查的价值取决于「它看了哪些文件」，

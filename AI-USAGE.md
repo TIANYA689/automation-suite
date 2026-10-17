@@ -89,8 +89,16 @@ python scripts/misc/check_projects.py --rebuild-index
 python scripts/misc/ai_finding.py add --kind path --area js-reverse --title "..." --trigger "..." --detail "..."
 python scripts/misc/ai_finding.py search "混淆 字符串数组"
 python scripts/misc/ai_finding.py validate
-# 外部 GitHub 来源清单的离线 schema/固定版本/许可证占位检查（不联网）
+# 外部 GitHub 来源清单：默认离线只校验 schema 与台账覆盖；`--network` 才真查 API
+# （仓库存在性 / archived / 许可证 / revision 是否存在 / HEAD 是否漂移 / 台账是否陈旧）。
+# 离线是默认值，因为 CI 不该依赖网络与 token；联网核验是人工复核时显式开启的动作。
 python scripts/misc/check_upstream_sources.py
+python scripts/misc/check_upstream_sources.py --network --json
+# 全历史泄漏扫描：扫 diff 新增行 **加上** commit 元数据与提交信息（作者邮箱最常漏在这里）。
+# 只读、默认只报告不拦；要当公开发布前的门禁才加 `--fail-on identity_email`。
+# 注意：它扫的是 git 历史，浅克隆里只会看到 1 个 commit——CI 里必须先 fetch-depth: 0。
+python scripts/misc/check_history_leaks.py
+python scripts/misc/check_history_leaks.py --fail-on identity_email
 # 注册 MCP 到 WorkBuddy / Claude Code / Codex（默认 dry-run，--write 才落盘）
 python scripts/misc/install_router_mcp.py
 # MCP 服务器 stdio 冒烟检查

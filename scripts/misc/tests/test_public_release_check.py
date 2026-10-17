@@ -458,5 +458,28 @@ class ScanFloorTests(unittest.TestCase):
         self.assertGreaterEqual(report["scanned_files"], MIN_SCANNED_FILES)
 
 
+    def test_self_detection_exemption_is_pinned_to_the_detector(self) -> None:
+        """豁免表只允许「检测器 + 它的测试」，且只允许检测器必然要写出的那几类。
+
+        要扩表就得同时改这条用例——改不动，就说明这次豁免需要单独论证。
+        """
+        self.assertEqual(
+            set(public_release_check.SELF_DETECTION_EXEMPT),
+            {
+                "scripts/misc/check_history_leaks.py",
+                "scripts/misc/tests/test_check_history_leaks.py",
+            },
+        )
+        # 与检测逻辑无关的类型不在这张表里：往这两个文件里塞真人手机号或身份证号照样报。
+        self.assertNotIn("pii_phone", public_release_check.SELF_DETECTION_KINDS)
+        self.assertNotIn("pii_id_number", public_release_check.SELF_DETECTION_KINDS)
+        # 豁免不蔓延到别的测试文件。
+        self.assertFalse(
+            public_release_check._is_self_detection(
+                "scripts/misc/tests/test_public_release_check.py", "pii_email"
+            )
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

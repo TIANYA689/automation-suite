@@ -17,8 +17,13 @@ jobs:
     env:
       PYTHONIOENCODING: utf-8
     steps:
+      # `fetch-depth: 0` 是承重的：下面那条全历史泄漏扫描读的是 git 历史，
+      # 默认浅克隆（depth=1）只会看到 1 个 commit，扫完照样输出「没有泄漏」——
+      # 那不是通过，是没扫。判据的执行面必须真的执行。
       - name: Checkout
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -32,3 +37,10 @@ jobs:
       # 文档交叉引用可达性：确保 tag 提交里的文档引用全部真实存在。
       - name: Cross-reference check
         run: python scripts/misc/check_doc_refs.py
+
+      # 全历史泄漏扫描：只报告不拦（`--fail-on` 由人工按需加）。
+      # 不设成失败是有意的：本仓历史里存在早期提交者的个人邮箱，
+      # 那是既成事实，写成硬门禁只会让每次打 tag 都红，然后被忽略。
+      # 真要公开前，人工跑 `--fail-on identity_email` 决定是否重写历史。
+      - name: History leak report
+        run: python scripts/misc/check_history_leaks.py --json
