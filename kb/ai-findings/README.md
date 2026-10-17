@@ -71,6 +71,24 @@ python scripts/misc/ai_finding.py list --limit 20
 
 一条 finding 如果被反复验证且具有普遍性，应当由 `knowledge-architect` 提炼进对应 techniques 文件；提炼后把 finding 的 `status` 改为 `superseded`，并在 `detail` 里指向新技术文件。
 
+## 质量门禁
+
+`scripts/misc/check_kb_quality.py` 是只读门禁，回答两个问题：
+
+- **active 的 finding 必须有证据**，且证据在**本仓库里拥有**——判据用 `git ls-files`，
+  不用工作区遍历；否则被 gitignore 的 `projects/`、`exports/` 会在本地解析成功、
+  在干净克隆里失败（本地绿、CI 红）。
+- **superseded 的 finding 必须指向真实存在的技术条目**——即 `detail` 里点名的
+  `kb/*/techniques/*.md` 必须能解析到本仓库里的文件，否则「已提炼」这句话无从复核。
+
+默认只出 warning；`--strict` 才把 warning 升级为失败。`findings.jsonl` 不存在、解析出
+0 条、或 active 一条都没有时直接报错退出——**空集不能当作通过**。
+
+```bash
+python scripts/misc/check_kb_quality.py
+python scripts/misc/check_kb_quality.py --strict
+```
+
 ## 维护纪律
 
 - 追加不修改历史记录；结论变化用 `status` 标记，保留原始记录。

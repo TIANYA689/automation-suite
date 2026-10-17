@@ -141,7 +141,25 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="run only the manifest schema check (the ledger may not exist yet)",
     )
+    parser.add_argument(
+        "--ledger-only",
+        action="store_true",
+        help=(
+            "run only the ledger-coverage check. CI uses this as its own step so a "
+            "coverage failure is located separately from a manifest-schema failure."
+        ),
+    )
     args = parser.parse_args(argv)
+
+    if args.skip_ledger and args.ledger_only:
+        print(json.dumps({"ok": False, "errors": ["--skip-ledger 与 --ledger-only 互斥"]}, ensure_ascii=False, indent=2))
+        return 1
+
+    if args.ledger_only:
+        coverage = check_ledger_coverage(args.ledger, args.manifest)
+        report = {"ok": bool(coverage["ok"]), "mode": "ledger-only", "ledger_coverage": coverage}
+        print(json.dumps(report, ensure_ascii=False, indent=2))
+        return 0 if report["ok"] else 1
 
     report = validate(args.manifest)
     schema_ok = bool(report["ok"])

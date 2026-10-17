@@ -340,7 +340,14 @@ class RealRepositoryTests(unittest.TestCase):
         steps, skipped = rcc.derive_steps(text.read_text(encoding="utf-8"))
         self.assertGreaterEqual(len(steps), 10, [s["name"] for s in steps])
         names = {s["name"] for s in steps}
-        for expected in ("Cross-reference check", "Offline unit tests"):
+        # 接线本身要被测（MEMORY 规则 102）：这几条门禁必须在 CI 里真的被派生出，
+        # 否则「本地跑得到、CI 少了它」不会有任何地方报错。
+        for expected in (
+            "Cross-reference check",
+            "Findings quality check",
+            "Upstream ledger coverage check",
+            "Offline unit tests",
+        ):
             self.assertIn(expected, names)
         self.assertTrue(skipped)
 

@@ -70,8 +70,20 @@ jobs:
       - name: Findings library validation
         run: python scripts/misc/ai_finding.py validate
 
+      # ai_finding validate 只校验字段形态；这一步回答的是「active 的 finding 有没有
+      # 一条本仓库拥有的证据、superseded 有没有指向真实技术条目」。判据用 git ls-files，
+      # 所以被 gitignore 的本地产物不会被当成证据。默认只出 warning（--strict 才升级为
+      # 失败），但 findings.jsonl 缺失/空解析/无 active 会直接红——空集不当通过。
+      - name: Findings quality check
+        run: python scripts/misc/check_kb_quality.py
+
       - name: Upstream source manifest check
         run: python scripts/misc/check_upstream_sources.py
+
+      # 台账覆盖独立成一步：上一步失败可能只是清单 schema 问题，这一步失败则明确是
+      # 「台账点名的仓库没登记进清单」。两条判据分开跑，失败位置才能一眼定位。
+      - name: Upstream ledger coverage check
+        run: python scripts/misc/check_upstream_sources.py --ledger-only
 
       - name: Install module test dependencies
         shell: bash

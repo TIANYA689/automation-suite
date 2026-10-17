@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -50,6 +51,54 @@ SCRIPT_ORPHAN_EXEMPT: tuple[tuple[str, str], ...] = (
 )
 
 DOC_SUFFIXES = (".md",)
+
+# kb-index.json 条目的**可选**元数据字段（审计 P1）。允许逐步迁移：**不要求**所有
+# 条目都填，只对**已填**的字段做类型/枚举校验。这样现有 8 个索引文件不填新字段也能过。
+KB_ENTRY_STATUSES = ("draft", "active", "deprecated")
+KB_EVIDENCE_LEVELS = ("observed", "inferred", "unverified")
+KB_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def _check_entry_fields(entry: dict, identifier: object, index_rel: str) -> list[dict]:
+    """校验条目里**已填**的可选字段。未填（缺键或 null）一律放行。"""
+    drifts: list[dict] = []
+
+    def bad(detail: str) -> None:
+        drifts.append({"file": index_rel, "kind": "kb_entry_bad_field", "detail": detail})
+
+    owner = entry.get("owner")
+    if owner is not None and (not isinstance(owner, str) or not owner.strip()):
+        bad(f"条目 {identifier} 的 owner 必须是非空字符串")
+
+    status = entry.get("status")
+    if status is not None and status not in KB_ENTRY_STATUSES:
+        bad(f"条目 {identifier} 的 status 非法: {status!r}（可选 {list(KB_ENTRY_STATUSES)}）")
+
+    last_reviewed = entry.get("last_reviewed")
+    if last_reviewed is not None and (
+        not isinstance(last_reviewed, str) or not KB_DATE_RE.fullmatch(last_reviewed)
+    ):
+        bad(f"条目 {identifier} 的 last_reviewed 必须是 YYYY-MM-DD: {last_reviewed!r}")
+
+    evidence_level = entry.get("evidence_level")
+    if evidence_level is not None and evidence_level not in KB_EVIDENCE_LEVELS:
+        bad(
+            f"条目 {identifier} 的 evidence_level 非法: {evidence_level!r}"
+            f"（可选 {list(KB_EVIDENCE_LEVELS)}）"
+        )
+
+    supersedes = entry.get("supersedes")
+    if supersedes is not None:
+        single = isinstance(supersedes, str) and bool(supersedes.strip())
+        many = (
+            isinstance(supersedes, list)
+            and bool(supersedes)
+            and all(isinstance(item, str) and item.strip() for item in supersedes)
+        )
+        if not (single or many):
+            bad(f"条目 {identifier} 的 supersedes 必须是非空字符串或非空字符串列表")
+
+    return drifts
 
 
 def _docs() -> list[Path]:
@@ -116,15 +165,28 @@ def _check_kb(drifts: list[dict[str, object]]) -> tuple[int, int]:
 
         directory = index_file.parent
         listed: set[str] = set()
+        index_rel = index_file.relative_to(ROOT).as_posix()
         for entry in payload.get("entries", []):
             entries_seen += 1
+            if not isinstance(entry, dict):
+                drifts.append(
+                    {
+                        "file": index_rel,
+                        "kind": "kb_entry_bad_field",
+                        "detail": "索引条目必须是对象",
+                    }
+                )
+                continue
             identifier = entry.get("id", "?")
+            # 可选元数据（owner/status/last_reviewed/evidence_level/supersedes）：只校验
+            # 已填的，不强制全填——审计 P1 要求逐步迁移，现有条目不带这些字段也要过。
+            drifts.extend(_check_entry_fields(entry, identifier, index_rel))
             files = entry.get("files") or []
             signals = entry.get("signals") or []
             if not files or not signals:
                 drifts.append(
                     {
-                        "file": index_file.relative_to(ROOT).as_posix(),
+                        "file": index_rel,
                         "kind": "kb_empty_entry",
                         "detail": f"条目 {identifier} 缺 {'files' if not files else 'signals'}",
                     }
@@ -135,7 +197,7 @@ def _check_kb(drifts: list[dict[str, object]]) -> tuple[int, int]:
                 if not (directory / name).is_file():
                     drifts.append(
                         {
-                            "file": index_file.relative_to(ROOT).as_posix(),
+                            "file": index_rel,
                             "kind": "kb_missing_file",
                             "detail": f"条目 {identifier} 指向不存在的 {name}",
                         }

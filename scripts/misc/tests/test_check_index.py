@@ -65,6 +65,18 @@ class CompletenessTests(unittest.TestCase):
             json.dumps(payload, ensure_ascii=False), encoding="utf-8", newline="\n"
         )
 
+    def _write_raw_index(self, entries: list[dict]) -> None:
+        """直接写任意 entries，用于校验可选元数据字段。"""
+        payload = {"version": "1.0", "entries": entries}
+        (self.root / "kb" / "demo" / "techniques" / "kb-index.json").write_text(
+            json.dumps(payload, ensure_ascii=False), encoding="utf-8", newline="\n"
+        )
+
+    def _entry(self, **overrides: object) -> dict:
+        entry: dict = {"id": "demo", "signals": ["信号"], "files": ["01-real.md"], "priority": 10}
+        entry.update(overrides)
+        return entry
+
     def _write_skill(self, name: str, references: dict[str, str] | None = None) -> None:
         directory = self.root / "skills" / name
         directory.mkdir(parents=True, exist_ok=True)
@@ -181,6 +193,65 @@ class CompletenessTests(unittest.TestCase):
         report = run()
         self.assertFalse(report["ok"])
         self.assertIn("skill_undeclared", self._kinds(report))
+
+    # --- 可选元数据字段（审计 P1）：只校验已填的，不要求全填 --------------------
+
+    def _prepare_demo_file(self) -> None:
+        (self.root / "kb" / "demo" / "techniques" / "01-real.md").write_text(
+            "# x\n", encoding="utf-8", newline="\n"
+        )
+        self._write_routing([])
+
+    def test_optional_metadata_fields_accepted(self) -> None:
+        self._prepare_demo_file()
+        self._write_raw_index(
+            [
+                self._entry(
+                    owner="knowledge-architect",
+                    status="active",
+                    last_reviewed="2026-10-01",
+                    evidence_level="observed",
+                    supersedes=["old-entry"],
+                )
+            ]
+        )
+        self.assertTrue(run()["ok"], run()["drifts"])
+
+    def test_fields_absent_still_pass(self) -> None:
+        """逐步迁移：不填新字段的条目必须照旧通过。"""
+        self._prepare_demo_file()
+        self._write_raw_index([self._entry()])
+        self.assertTrue(run()["ok"], run()["drifts"])
+
+    def test_unknown_status_is_detected(self) -> None:
+        self._prepare_demo_file()
+        self._write_raw_index([self._entry(status="bogus")])
+        self.assertIn("kb_entry_bad_field", self._kinds(run()))
+
+    def test_bad_last_reviewed_is_detected(self) -> None:
+        self._prepare_demo_file()
+        self._write_raw_index([self._entry(last_reviewed="2026/10/01")])
+        self.assertIn("kb_entry_bad_field", self._kinds(run()))
+
+    def test_unknown_evidence_level_is_detected(self) -> None:
+        self._prepare_demo_file()
+        self._write_raw_index([self._entry(evidence_level="guessed")])
+        self.assertIn("kb_entry_bad_field", self._kinds(run()))
+
+    def test_bad_owner_type_is_detected(self) -> None:
+        self._prepare_demo_file()
+        self._write_raw_index([self._entry(owner=123)])
+        self.assertIn("kb_entry_bad_field", self._kinds(run()))
+
+    def test_bad_supersedes_type_is_detected(self) -> None:
+        self._prepare_demo_file()
+        self._write_raw_index([self._entry(supersedes=123)])
+        self.assertIn("kb_entry_bad_field", self._kinds(run()))
+
+    def test_empty_supersedes_list_is_detected(self) -> None:
+        self._prepare_demo_file()
+        self._write_raw_index([self._entry(supersedes=[])])
+        self.assertIn("kb_entry_bad_field", self._kinds(run()))
 
 
 class RealRepositoryTests(unittest.TestCase):
