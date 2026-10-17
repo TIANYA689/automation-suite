@@ -38,9 +38,18 @@ jobs:
       - name: Cross-reference check
         run: python scripts/misc/check_doc_refs.py
 
-      # 全历史泄漏扫描：只报告不拦（`--fail-on` 由人工按需加）。
-      # 不设成失败是有意的：本仓历史里存在早期提交者的个人邮箱，
-      # 那是既成事实，写成硬门禁只会让每次打 tag 都红，然后被忽略。
-      # 真要公开前，人工跑 `--fail-on identity_email` 决定是否重写历史。
-      - name: History leak report
-        run: python scripts/misc/check_history_leaks.py --json
+      # 全历史泄漏扫描，并对「身份邮箱」硬拦。
+      # 2026-10-17 已把历史的作者/提交者统一为仓库所有者的 GitHub noreply 地址
+      # （`--env-filter`），并把提交信息里嵌入的旧邮箱一并掩码（`--msg-filter`）。
+      # 现在 `identity_exposed` 为 0，所以这条门禁有实际意义：再有人用真实个人
+      # 邮箱提交，打 tag 时会红。
+      #
+      # 只拦 `identity_email`，不拦其余形态：盘符路径、邮箱、私钥头这些
+      # `abs_path_windows` / `email` / `private_key` 命中来自检测器自身的
+      # 正则与测试夹具——检测器必然包含它要抓的形态，它们由
+      # `public_release_check.py` 的显式豁免表覆盖，不该在这里二次判死。
+      #
+      # 取舍：本仓是个人仓库，署名统一到所有者。若将来接受外部贡献，
+      # 这条要么放宽，要么要求贡献者用 noreply 地址。
+      - name: History leak check
+        run: python scripts/misc/check_history_leaks.py --fail-on identity_email --json
