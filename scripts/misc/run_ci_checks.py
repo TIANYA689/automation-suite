@@ -176,13 +176,20 @@ def _not_a_clean_clone() -> str | None:
     """`--as-ci` 的断言假设「干净克隆」。返回一句说明，或 None 表示看起来干净。
 
     判据只用**两个廉价信号**，不跑 `git status --ignored`（`tmp/` 有几千个文件，太慢）：
-    `cases/` 非空、或 `routing.index.json` 存在——这两样在干净克隆里都不该有。
+    `cases/` 有除 `.gitkeep` 之外的条目、或 `routing.index.json` 存在——这两样在
+    干净克隆里都不该有。
     """
     cases = ROOT / "cases"
     if cases.is_dir():
-        entries = list(cases.iterdir())
+        # `.gitkeep` 是被**跟踪**的占位文件，真实克隆里 `cases/` 恒含它一个。
+        # 把它算作「脏」会让 `--as-ci` 在干净克隆里恒定误报——判据要按
+        # 「本仓库拥有什么」算，而不是「目录里有什么」。
+        entries = [p for p in cases.iterdir() if p.name != ".gitkeep"]
         if entries:
-            return f"cases/ 下有 {len(entries)} 个条目（干净克隆里 cases/ 是空的，被 .gitignore 挡住）"
+            return (
+                f"cases/ 下有 {len(entries)} 个条目"
+                "（干净克隆里 cases/ 只有被跟踪的 .gitkeep，其余被 .gitignore 挡住）"
+            )
     if (ROOT / "routing.index.json").exists():
         return "routing.index.json 存在（干净克隆里没有：它是派生文件且被 .gitignore 挡住）"
     return None

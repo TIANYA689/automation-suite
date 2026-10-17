@@ -327,6 +327,18 @@ class AsCiTests(unittest.TestCase):
         _, output = self._main(["--as-ci", "--list"])
         self.assertNotIn("提示", output)
 
+    def test_clean_clone_with_gitkeep_is_not_warned(self) -> None:
+        """真实克隆的形态：`cases/` 里有被跟踪的 `.gitkeep`，这不代表脏。
+
+        上一条用例的沙箱里 `cases/` 根本不存在——那是**测试自己的形态假设**，
+        真实克隆里 `cases/.gitkeep` 恒在（它被 git 跟踪）。按「目录非空」判会把
+        每个干净克隆都误报成脏。
+        """
+        (self.root / "cases").mkdir(exist_ok=True)
+        (self.root / "cases" / ".gitkeep").write_text("", encoding="utf-8")
+        _, output = self._main(["--as-ci", "--list"])
+        self.assertNotIn("提示", output)
+
     def test_routing_index_also_marks_a_dirty_tree(self) -> None:
         """第二个廉价信号：`routing.index.json` 是派生且被 gitignore，克隆里不该有。"""
         (self.root / "routing.index.json").write_text("{}", encoding="utf-8")
