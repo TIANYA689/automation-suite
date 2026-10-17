@@ -51,11 +51,11 @@
     },
     {
       "id": "apk-reverse",
-      "url": "https://github.com/newliver666/apk-reverse",
+      "url": "https://github.com/wuyingzhishang/apk-reverse",
       "revision": "7b6c6932a95f03d778e81e5e1a2cbf6f62dc97fd",
       "spdx_license": "MIT",
-      "checked_at": "2026-10-11",
-      "scope": "documentation-truth validators and android structure facts only; security-bypass content and all upstream scripts excluded; no source code copied; GitHub API reported MIT; archived=false; NOTE 2026-10-17: repo now returns HTTP 404 (deleted or renamed upstream) — the absorbed design notes are unaffected, but this URL is no longer resolvable and the entry should be retired or re-pointed"
+      "checked_at": "2026-10-17",
+      "scope": "documentation-truth validators and android structure facts only; security-bypass content and all upstream scripts excluded; no source code copied; GitHub API reported MIT; archived=false; NOTE 2026-10-17: original owner newliver666/apk-reverse now returns HTTP 404 (deleted or renamed); this entry re-points to a fork created 2026-10-17 that still resolves the recorded revision 7b6c6932 — the fork is a copy, not the original upstream, so provenance beyond that revision is only as good as the copy"
     }
   ]
 }
