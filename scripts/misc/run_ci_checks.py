@@ -32,6 +32,18 @@ CI 会先装依赖，本地要自己装：
     git clone <本仓库路径> /tmp/ci-probe && cd /tmp/ci-probe
     python scripts/misc/run_ci_checks.py --as-ci
 
+**失败分类**：性质相反的失败在汇总里必须分得开，否则读的人会把「预期失败」
+当成「CI 红了」，或者反过来把真回归当成环境问题。每个失败步骤归入三类之一：
+
+- `expected`：当前目录不是干净克隆，且该步骤的 CI 断言（`--expect-cases`
+  之类）恰恰假设空克隆；
+- `env`：输出含 `ModuleNotFoundError: No module named 'X'`，**且** `ci.yml`
+  里在它之前有一个名称含 `Install` 的步骤提及 `X`——两个条件缺一不可；
+- `real`：其余一切，**包括判不准的情况**。归错方向等于放行。
+
+`--allow-expected`（默认关闭）只在所有失败都属 `expected`/`env` 时把退出码
+置 0，并明确打印「这是被显式放行的，不是真绿」。
+
 用法：
 
     python scripts/misc/run_ci_checks.py                  # 跑全部
@@ -40,6 +52,7 @@ CI 会先装依赖，本地要自己装：
     python scripts/misc/run_ci_checks.py --skip mcp       # 跳过名字/命令含该串的步骤
     python scripts/misc/run_ci_checks.py --fail-fast      # 对齐 CI 的遇错即停
     python scripts/misc/run_ci_checks.py --as-ci          # 按 CI 原样（用于克隆里预演）
+    python scripts/misc/run_ci_checks.py --as-ci --allow-expected  # 显式放行预期/环境失败
     python scripts/misc/run_ci_checks.py --json           # 机器可读
 
 零第三方依赖。
@@ -64,7 +77,18 @@ RUN_RE = re.compile(r"^\s*run:\s*(?P<value>\S.*)$")
 CHECK_COMMAND_RE = re.compile(r"^python\s+\S+\.py(?:\s|$)")
 BLOCK_SCALARS = ("|", ">", "|-", ">-", "|+", ">+")
 
+# 对「空克隆」的断言参数。新增同类参数时加到这里，不要按步骤名写死列表。
+EMPTY_CLONE_ASSERTION_RE = re.compile(r"--expect-(?:cases|jobs)\b")
+MODULE_NOT_FOUND_RE = re.compile(r"ModuleNotFoundError: No module named '([^']+)'")
+
 OUTPUT_TAIL_LINES = 12
+
+CATEGORY_ORDER = ("expected", "env", "real")
+CATEGORY_TITLES = {
+    "expected": "预期失败（当前目录不是干净克隆）",
+    "env": "环境缺失（本机缺 CI 会先装的依赖）",
+    "real": "真失败（需要修的）",
+}
 
 # 有些步骤的参数是**为 CI 环境写的断言**，照搬到本地会失真。逐条说明并改写，
 # 且**全量打印**——悄悄改参数等于悄悄换判据。
@@ -186,13 +210,117 @@ def _not_a_clean_clone() -> str | None:
         # 「本仓库拥有什么」算，而不是「目录里有什么」。
         entries = [p for p in cases.iterdir() if p.name != ".gitkeep"]
         if entries:
+            has_keep = (cases / ".gitkeep").exists()
+            tracked_keep = "（另有被跟踪的 .gitkeep）" if has_keep else ""
             return (
-                f"cases/ 下有 {len(entries)} 个条目"
-                "（干净克隆里 cases/ 只有被跟踪的 .gitkeep，其余被 .gitignore 挡住）"
+                f"cases/ 下有 {len(entries)} 个作业目录{tracked_keep}"
+                "；干净克隆里 cases/ 只有被跟踪的 .gitkeep，其余被 .gitignore 挡住"
             )
     if (ROOT / "routing.index.json").exists():
         return "routing.index.json 存在（干净克隆里没有：它是派生文件且被 .gitignore 挡住）"
     return None
+
+
+def _module_not_found(output: str) -> list[str]:
+    """取出输出里所有 `ModuleNotFoundError: No module named 'X'` 的 X。"""
+    return sorted(set(MODULE_NOT_FOUND_RE.findall(output)))
+
+
+def _install_step_before(
+    blocks: list[tuple[str, list[str]]], index: int, module: str
+) -> tuple[str, str] | None:
+    """在 `index` 之前找一个名称含 `Install`、且提及 `module` 的步骤。
+
+    返回 (步骤名, 步骤正文) 或 None。名称也算「提及」——`Install routing MCP
+    dependencies` 的正文里只有 requirements 路径，模块名写在步骤名上。
+    """
+    pattern = re.compile(
+        rf"(?<![\w.-]){re.escape(module)}(?![\w.-])", re.IGNORECASE
+    )
+    for name, lines in blocks[:index]:
+        if "install" not in name.lower():
+            continue
+        body = "\n".join(lines)
+        if pattern.search(name + "\n" + body):
+            return name, body
+    return None
+
+
+def _install_remedy(body: str, module: str) -> str:
+    """从 Install 步骤的命令里推出补救动作；推不出就退回装模块名。"""
+    match = re.search(r"pip\s+install\s+-r\s+(\S+)", body)
+    if match:
+        return f"python -m pip install -r {match.group(1)}"
+    return f"python -m pip install {module}"
+
+
+def classify_failure(
+    result: dict[str, object],
+    blocks: list[tuple[str, list[str]]],
+    dirty_reason: str | None,
+) -> dict[str, str]:
+    """给一个失败步骤判定 `expected` / `env` / `real`。
+
+    **判不准一律 `real`**：`expected`/`env` 只影响汇总呈现与 `--allow-expected`
+    的放行，归错方向等于把真失败放行。
+    """
+    name = str(result["name"])
+    command = str(result["command"])
+    output = str(result["output"])
+    exit_code = result["exit_code"]
+
+    index = next(
+        (i for i, (block_name, _) in enumerate(blocks) if block_name == name), None
+    )
+
+    modules = _module_not_found(output)
+    if modules:
+        # 有缺依赖信号：必须每个缺失模块都能对上 CI 的 Install 步骤，才算 env。
+        resolved: list[tuple[str, str, str]] = []
+        if index is not None:
+            for module in modules:
+                found = _install_step_before(blocks, index, module)
+                if found is None:
+                    break
+                resolved.append((module, found[0], found[1]))
+        if index is not None and len(resolved) == len(modules):
+            module, install_name, install_body = resolved[0]
+            return {
+                "category": "env",
+                "reason": (
+                    f"输出含 `ModuleNotFoundError: No module named '{module}'`，"
+                    f"且 ci.yml 前置步骤 `{install_name}` 提及它"
+                ),
+                "remedy": _install_remedy(install_body, module),
+            }
+        return {
+            "category": "real",
+            "reason": (
+                f"输出含 `ModuleNotFoundError: No module named '{modules[0]}'`，"
+                "但 ci.yml 里没有前置 Install 步骤提及它——不能当作环境缺失放行"
+            ),
+            "remedy": f"确认缺失依赖是否应由 CI 安装，然后修脚本：{name}",
+        }
+
+    assertion = EMPTY_CLONE_ASSERTION_RE.search(command)
+    if dirty_reason and assertion:
+        return {
+            "category": "expected",
+            "reason": f"{dirty_reason}；命令含 `{assertion.group(0)}`（对空克隆的断言）",
+            "remedy": (
+                "在干净克隆里跑：`git clone <仓库> <临时目录>`，"
+                "再在克隆里执行 `python scripts/misc/run_ci_checks.py --as-ci`"
+            ),
+        }
+
+    return {
+        "category": "real",
+        "reason": f"未匹配到预期失败或环境缺失的信号（exit={exit_code}），按真失败处理",
+        "remedy": (
+            "单独复跑看完整输出："
+            f'`python scripts/misc/run_ci_checks.py --only "{name}" --verbose`'
+        ),
+    }
 
 
 def run_step(step: dict[str, str], timeout: int) -> dict[str, object]:
@@ -245,13 +373,24 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--verbose", action="store_true", help="成功的步骤也打印完整输出")
     parser.add_argument("--timeout", type=int, default=900, help="单步超时秒数")
+    parser.add_argument(
+        "--allow-expected",
+        action="store_true",
+        help=(
+            "若所有失败都属预期失败/环境缺失，退出码置 0；"
+            "输出会明确说明这是显式放行，不是真绿（默认关闭）"
+        ),
+    )
     args = parser.parse_args(argv)
 
     if not WORKFLOW.exists():
         print(f"FAIL: 找不到 {WORKFLOW.relative_to(ROOT).as_posix()}")
         return 1
 
-    steps, skipped = derive_steps(WORKFLOW.read_text(encoding="utf-8"))
+    workflow_text = WORKFLOW.read_text(encoding="utf-8")
+    steps, skipped = derive_steps(workflow_text)
+    # 分类要看 ci.yml 的**全部**步骤（含被跳过的 Install 步骤），所以用未过滤的块。
+    blocks = _blocks(workflow_text)
 
     # 空表守卫：派生不到步骤 = 判据空转（派生规则或工作流结构变了）。
     # 放在 --only 过滤**之前**，否则用户筛空了也会被当成判据坏了。
@@ -259,11 +398,13 @@ def main(argv: list[str] | None = None) -> int:
         print("FAIL: 没从 ci.yml 派生出任何检查步骤——判据空转（派生规则或工作流结构变了）")
         return 1
 
+    # 无论哪种模式都算一次：默认模式的失败分类同样需要「像不像干净克隆」。
+    dirty = _not_a_clean_clone()
+
     if args.as_ci:
         # 按 CI 原样：不应用 LOCAL_OVERRIDES。这是唯一能回答「CI 会不会绿」的模式。
         # 但它照搬的是 CI 对**空克隆**的断言，所以要先说清当前目录像不像克隆。
         steps, overrides = steps, []
-        dirty = _not_a_clean_clone()
         if dirty:
             print(f"提示：{dirty}")
             print("      `--as-ci` 照搬 CI 对**空克隆**的断言，当前目录不是干净克隆，")
@@ -336,16 +477,33 @@ def main(argv: list[str] | None = None) -> int:
 
     failed = [r for r in results if r["exit_code"] != 0]
 
+    # 逐条判定类别。判不准一律 real（见 classify_failure 的说明）。
+    buckets: dict[str, list[tuple[dict[str, object], dict[str, str]]]] = {
+        key: [] for key in CATEGORY_ORDER
+    }
+    for result in failed:
+        info = classify_failure(result, blocks, dirty)
+        buckets[info["category"]].append((result, info))
+
+    real_failures = buckets["real"]
+    allowed = bool(failed) and not real_failures and args.allow_expected
+
     if args.json:
         print(
             json.dumps(
                 {
                     "ok": not failed,
+                    "allowed": allowed,
+                    "allow_expected": args.allow_expected,
                     "workflow": WORKFLOW.relative_to(ROOT).as_posix(),
                     "as_ci": args.as_ci,
                     "derived": len(steps),
                     "ran": len(results),
                     "failed": [r["name"] for r in failed],
+                    "failed_by_category": {
+                        key: [r["name"] for r, _ in buckets[key]]
+                        for key in CATEGORY_ORDER
+                    },
                     "skipped": skipped,
                     "deselected": [step["name"] for step in deselected],
                     "overrides": overrides,
@@ -355,7 +513,7 @@ def main(argv: list[str] | None = None) -> int:
                 indent=2,
             )
         )
-        return 0 if not failed else 1
+        return 0 if allowed or not failed else 1
 
     print()
     print(f"派生 {len(steps)} 步，执行 {len(results)} 步，失败 {len(failed)} 步。")
@@ -373,11 +531,48 @@ def main(argv: list[str] | None = None) -> int:
         print(f"被 --skip 跳过、本次未校验的检查步骤（共 {len(deselected)} 个）：")
         for item in deselected:
             print(f"  - {item['name']}")
+
     if failed:
-        print("失败的步骤：" + "、".join(str(r["name"]) for r in failed))
+        print("按类别分开（预期失败与环境缺失不是「CI 红了」，真失败才是）：")
+        for key in CATEGORY_ORDER:
+            items = buckets[key]
+            if not items:
+                continue
+            print(f"[{CATEGORY_TITLES[key]}] {len(items)} 步")
+            for result, info in items:
+                print(f"  - {result['name']}")
+                print(f"      原因：{info['reason']}")
+                print(f"      补救：{info['remedy']}")
+
+    if not failed:
+        print("RESULT=OK")
+        return 0
+
+    if not real_failures:
+        if allowed:
+            print()
+            print("=" * 78)
+            print("显式放行（--allow-expected）：所有失败都属预期失败/环境缺失，退出码置 0。")
+            print("这不是真绿——换到干净克隆或补齐依赖后必须复跑。")
+            print("=" * 78)
+            return 0
+        if args.as_ci:
+            print(
+                "没有任何「真失败」，但退出码仍为 1，"
+                "因为 `--as-ci` 的语义就是按 CI 原样跑。"
+            )
+        else:
+            print(
+                "没有任何「真失败」，但退出码仍为 1；"
+                "要显式放行请加 `--allow-expected`。"
+            )
         return 1
-    print("RESULT=OK")
-    return 0
+
+    print(
+        "失败的步骤（真失败）："
+        + "、".join(str(result["name"]) for result, _ in real_failures)
+    )
+    return 1
 
 
 if __name__ == "__main__":

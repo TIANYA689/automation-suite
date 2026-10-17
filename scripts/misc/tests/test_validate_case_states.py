@@ -173,6 +173,17 @@ class ExpectCasesTests(CaseStateTestCase):
         self.assertIn("应为 0 个", out)
         self.assertIn("实际 1 个", out)
 
+    def test_count_mismatch_names_the_counting_unit(self) -> None:
+        """计数口径必须写清楚：这里是 `state.json` + `ai_manifest.json` 的**文件数**。
+
+        与 `run_ci_checks.py` 的「作业目录数」单位不同，量词不能都叫「个条目」。
+        """
+        self._add_case("ad-hoc")
+        code, out = self._run(["--expect-cases", "0"])
+        self.assertEqual(code, 1)
+        self.assertIn("校验项（state.json + ai_manifest.json）应为 0 个", out)
+        self.assertIn("实际 1 个", out)
+
     def test_positive_count_fails_when_empty(self) -> None:
         """反向也要钉住：断言不为 0 时空集必须失败，否则它只是装饰。"""
         code, out = self._run(["--expect-cases", "3"])

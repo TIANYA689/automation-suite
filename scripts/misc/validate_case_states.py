@@ -150,8 +150,8 @@ def main(argv: list[str] | None = None) -> int:
         type=int,
         default=None,
         metavar="N",
-        help="cases/ 下的校验项数量必须是 N（默认不检查）。CI 上显式传 0："
-        "cases/ 被 .gitignore 挡住，新克隆里只有 templates/case/ 会被校验。"
+        help="cases/ 下的校验项（state.json + ai_manifest.json）数量必须是 N（默认不检查）。"
+        "CI 上显式传 0：cases/ 被 .gitignore 挡住，新克隆里只有 templates/case/ 会被校验。"
         "把「空集」写成断言，将来若有人把 cases/ 纳入版本库，CI 会红，"
         "而不是悄悄改变这条门禁的含义。",
     )
@@ -164,7 +164,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.expect_cases is not None and coverage["case_items"] != args.expect_cases:
         errors.append(
-            f"cases/ 下的校验项应为 {args.expect_cases} 个，实际 {coverage['case_items']} 个"
+            f"cases/ 下的校验项（state.json + ai_manifest.json）应为 {args.expect_cases} 个，"
+            f"实际 {coverage['case_items']} 个"
             "——若这是有意改动（例如把 cases/ 纳入版本库），请同步更新 CI 的 --expect-cases"
         )
 

@@ -345,6 +345,174 @@ class AsCiTests(unittest.TestCase):
         _, output = self._main(["--as-ci", "--list"])
         self.assertIn("routing.index.json", output)
 
+    def test_dirty_warning_names_the_unit_as_job_directories(self) -> None:
+        """计数口径必须写清楚：这里是**作业目录**数，不是 state.json 的校验项数。"""
+        (self.root / "cases").mkdir(exist_ok=True)
+        (self.root / "cases" / ".gitkeep").write_text("", encoding="utf-8")
+        (self.root / "cases" / "job").mkdir()
+        _, output = self._main(["--as-ci", "--list"])
+        self.assertIn("1 个作业目录", output)
+        self.assertIn(".gitkeep", output)
+
+
+class FailureClassificationTests(unittest.TestCase):
+    """失败要分桶：预期失败 / 环境缺失 / 真失败。
+
+    分错方向等于放行：把真失败归成 `expected`/`env`，再加上 `--allow-expected`
+    就会以 0 退出。所以「判不准」必须是 `real`，这里逐条钉住。
+    """
+
+    def setUp(self) -> None:
+        self.root = _SANDBOX / f"case-{next(_COUNTER)}"
+        self.root.mkdir(parents=True, exist_ok=True)
+        self._original = (rcc.ROOT, rcc.WORKFLOW)
+        rcc.ROOT = self.root
+        rcc.WORKFLOW = self.root / "ci.yml"
+
+    def tearDown(self) -> None:
+        rcc.ROOT, rcc.WORKFLOW = self._original
+
+    def _workflow(self, steps: str) -> None:
+        rcc.WORKFLOW.write_text(
+            "jobs:\n  checks:\n    steps:\n" + steps, encoding="utf-8", newline="\n"
+        )
+
+    def _script(self, body: str) -> None:
+        (self.root / "probe.py").write_text(body, encoding="utf-8", newline="\n")
+
+    def _dirty_tree(self) -> None:
+        """制造「不是干净克隆」：`cases/` 下有真实作业目录。"""
+        (self.root / "cases" / "job").mkdir(parents=True, exist_ok=True)
+
+    def _main(self, argv: list[str]) -> tuple[int, str]:
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            code = rcc.main(argv)
+        return code, buffer.getvalue()
+
+    def test_expected_when_dirty_and_command_asserts_empty_clone(self) -> None:
+        self._dirty_tree()
+        self._workflow(
+            "      - name: Case state validation\n"
+            "        run: python probe.py --expect-cases 0\n"
+        )
+        self._script("import sys\nsys.exit(1)\n")
+        code, output = self._main(["--as-ci"])
+        self.assertEqual(code, 1)
+        self.assertIn("[预期失败（当前目录不是干净克隆）] 1 步", output)
+        self.assertIn("--expect-cases", output)
+        self.assertIn("git clone", output)
+        self.assertIn("没有任何「真失败」", output)
+        self.assertNotIn("[真失败", output)
+
+    def test_same_failure_without_the_empty_clone_flag_is_real(self) -> None:
+        """脏树不是万能挡箭牌：命令里没有空克隆断言，就是真失败。"""
+        self._dirty_tree()
+        self._workflow(
+            "      - name: Probe\n"
+            "        run: python probe.py\n"
+        )
+        self._script("import sys\nsys.exit(1)\n")
+        code, output = self._main(["--as-ci"])
+        self.assertEqual(code, 1)
+        self.assertIn("[真失败（需要修的）] 1 步", output)
+        self.assertIn("失败的步骤（真失败）：Probe", output)
+
+    def test_env_when_module_missing_and_ci_installs_it_before(self) -> None:
+        self._workflow(
+            "      - name: Install routing MCP dependencies\n"
+            "        run: python -m pip install -r scripts/automation/routing/requirements.txt\n"
+            "      - name: MCP stdio smoke check\n"
+            "        run: python probe.py\n"
+        )
+        self._script(
+            "import sys\n"
+            "print(\"ModuleNotFoundError: No module named 'mcp'\", file=sys.stderr)\n"
+            "sys.exit(1)\n"
+        )
+        code, output = self._main(["--as-ci"])
+        self.assertEqual(code, 1)
+        self.assertIn("[环境缺失（本机缺 CI 会先装的依赖）] 1 步", output)
+        self.assertIn("pip install -r scripts/automation/routing/requirements.txt", output)
+        self.assertIn("Install routing MCP dependencies", output)
+
+    def test_module_not_found_without_a_matching_install_step_is_real(self) -> None:
+        """最重要的防误放行：缺依赖信号有了，但 CI 没有先装它的步骤。
+
+        没有 Install 步骤，说明 CI 也不会补这个依赖——把它归成 `env` 会让
+        `--allow-expected` 把真失败放行。
+        """
+        self._workflow(
+            "      - name: Probe\n"
+            "        run: python probe.py\n"
+        )
+        self._script(
+            "import sys\n"
+            "print(\"ModuleNotFoundError: No module named 'mcp'\", file=sys.stderr)\n"
+            "sys.exit(1)\n"
+        )
+        code, output = self._main(["--as-ci", "--allow-expected"])
+        self.assertEqual(code, 1)
+        self.assertIn("[真失败（需要修的）] 1 步", output)
+        self.assertIn("没有前置 Install 步骤提及它", output)
+
+    def test_install_step_that_does_not_mention_the_module_is_real(self) -> None:
+        """两个条件必须同时成立：有 Install 步骤但没提及该模块，仍是真失败。"""
+        self._workflow(
+            "      - name: Install other deps\n"
+            "        run: python -m pip install requests\n"
+            "      - name: Probe\n"
+            "        run: python probe.py\n"
+        )
+        self._script(
+            "import sys\n"
+            "print(\"ModuleNotFoundError: No module named 'mcp'\", file=sys.stderr)\n"
+            "sys.exit(1)\n"
+        )
+        code, output = self._main(["--as-ci", "--allow-expected"])
+        self.assertEqual(code, 1)
+        self.assertIn("[真失败（需要修的）] 1 步", output)
+
+    def test_allow_expected_zeroes_exit_code_for_expected_only(self) -> None:
+        self._dirty_tree()
+        self._workflow(
+            "      - name: Case state validation\n"
+            "        run: python probe.py --expect-cases 0\n"
+        )
+        self._script("import sys\nsys.exit(1)\n")
+        code, output = self._main(["--as-ci", "--allow-expected"])
+        self.assertEqual(code, 0)
+        self.assertIn("显式放行", output)
+        self.assertIn("不是真绿", output)
+
+    def test_default_keeps_exit_code_1_for_expected_only(self) -> None:
+        """开关默认关闭：同样的预期失败，不带 `--allow-expected` 必须仍是 1。"""
+        self._dirty_tree()
+        self._workflow(
+            "      - name: Case state validation\n"
+            "        run: python probe.py --expect-cases 0\n"
+        )
+        self._script("import sys\nsys.exit(1)\n")
+        code, output = self._main(["--as-ci"])
+        self.assertEqual(code, 1)
+        self.assertNotIn("显式放行", output)
+
+    def test_allow_expected_does_not_hide_a_real_failure(self) -> None:
+        """混有真失败时，开了开关也必须非 0。"""
+        self._dirty_tree()
+        self._workflow(
+            "      - name: Case state validation\n"
+            "        run: python probe.py --expect-cases 0\n"
+            "      - name: Probe\n"
+            "        run: python probe.py\n"
+        )
+        self._script("import sys\nsys.exit(1)\n")
+        code, output = self._main(["--as-ci", "--allow-expected"])
+        self.assertEqual(code, 1)
+        self.assertIn("[预期失败（当前目录不是干净克隆）] 1 步", output)
+        self.assertIn("[真失败（需要修的）] 1 步", output)
+        self.assertIn("失败的步骤（真失败）：Probe", output)
+
 
 class RealRepositoryTests(unittest.TestCase):
     def test_real_workflow_derives_the_expected_checks(self) -> None:
