@@ -106,12 +106,44 @@ class KbQualityTests(unittest.TestCase):
         strict = self.run_check(strict=True)
         self.assertFalse(strict["ok"], "strict 下缺 evidence 的 active finding 必须失败")
 
-    def test_active_finding_with_unowned_evidence_is_flagged(self) -> None:
-        """负例：evidence 指向被 gitignore 的本地产物 → 本仓库不拥有 → 判失败。"""
-        self.write([finding(evidence={"path": "exports/demo/plan.json", "note": ""})])
+    def test_local_artifact_evidence_is_accepted(self) -> None:
+        """正例：证据落在**本地产物目录**里 —— 库自己的 README 就用
+        `--evidence "exports/..."` 举例。这些目录被 gitignore 是设计，不是缺陷，
+        判据不该要求证据搬进仓库（规则 98：判据的形态假设就是它的盲区）。
+
+        第三例专门钉住「点目录」：token 正则若不允许前导点，`.workbuddy-ai/…`
+        会被截成 `workbuddy-ai/…`，前缀匹配不上而误判断链。
+        """
+        for path in (
+            "exports/demo/plan.json",
+            "projects/20260925-avalon/capture/签到.har",
+            ".workbuddy-ai/memory/2026-09-26/验证-CI克隆预演.md",
+        ):
+            with self.subTest(path=path):
+                self.write([finding(evidence={"path": path, "note": ""})])
+                report = self.run_check(strict=True)
+                self.assertTrue(report["ok"], report)
+                self.assertEqual(report["warnings"], [])
+
+    def test_broken_in_repo_path_is_flagged(self) -> None:
+        """负例：像仓库内路径却解析不到 → 断链，strict 下必须失败。"""
+        self.write([finding(evidence={"path": "kb/demo/techniques/99-missing.md", "note": ""})])
         strict = self.run_check(strict=True)
         self.assertFalse(strict["ok"])
-        self.assertIn("evidence_not_owned", self.kinds(strict))
+        self.assertIn("evidence_broken", self.kinds(strict))
+
+    def test_low_confidence_without_evidence_is_allowed(self) -> None:
+        """README 约定「没有证据的发现只能给 low 置信度」——给了 low 就不算缺陷。
+
+        这条同时钉住「门禁要真的检查它引用的那条规则」：文案里写着这条约定，
+        代码就必须按它判，否则又是一次「声明比实现强」。
+        """
+        self.write(
+            [finding(confidence="low", evidence={"path": "没有可解析路径的描述", "note": ""})]
+        )
+        report = self.run_check(strict=True)
+        self.assertTrue(report["ok"], report)
+        self.assertEqual(report["warnings"], [])
 
     def test_superseded_without_technique_is_flagged(self) -> None:
         self.write(

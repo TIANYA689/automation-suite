@@ -75,18 +75,26 @@ python scripts/misc/ai_finding.py list --limit 20
 
 `scripts/misc/check_kb_quality.py` 是只读门禁，回答两个问题：
 
-- **active 的 finding 必须有证据**，且证据在**本仓库里拥有**——判据用 `git ls-files`，
-  不用工作区遍历；否则被 gitignore 的 `projects/`、`exports/` 会在本地解析成功、
-  在干净克隆里失败（本地绿、CI 红）。
-- **superseded 的 finding 必须指向真实存在的技术条目**——即 `detail` 里点名的
-  `kb/*/techniques/*.md` 必须能解析到本仓库里的文件，否则「已提炼」这句话无从复核。
+- **active 的 finding 有没有证据，证据是不是一条断链？** `evidence.path` 必须至少含
+  一个**像路径**的 token（这个字段的语义是「证据文件相对路径」，写成描述文字属字段误用）。
+  - 本仓库拥有的文件（`git ls-files` 命中）→ 通过；
+  - **本地产物**（`projects/` `exports/` `reports/` `notes/` `tmp/` `.workbuddy-ai/`）
+    → **通过**。本文件开头的示例就是 `--evidence "exports/..."`，这些目录是作业产物的
+    既定位置，被 gitignore 是设计而非缺陷——门禁**不要求证据搬进仓库**；
+  - 像仓库内路径却解析不到（文件被删或路径写错）→ 断链，报 `evidence_broken`。
+- **superseded 的 finding 必须指向真实存在的技术条目**——即 `detail` 或 `evidence`
+  里点名的 `kb/*/techniques/*.md` 必须能解析到本仓库里的文件，否则「已提炼」无从复核。
 
-默认只出 warning；`--strict` 才把 warning 升级为失败。`findings.jsonl` 不存在、解析出
-0 条、或 active 一条都没有时直接报错退出——**空集不能当作通过**。
+**没有证据的发现只能给 `low` 置信度**（见上面的字段说明）——所以 `confidence` 是
+`high` / `medium` 而 `evidence.path` 里一个路径 token 都没有时会报 `missing_evidence`；
+给了 `low` 就不算缺陷。门禁按它引用的这条规则判，而不是只在文案里提它。
+
+`findings.jsonl` 不存在、解析出 0 条、或 active 一条都没有时**直接报错退出**——
+空集不能当作通过（「跳过」与「通过」退出码相同本身就是缺陷）。
 
 ```bash
-python scripts/misc/check_kb_quality.py
-python scripts/misc/check_kb_quality.py --strict
+python scripts/misc/check_kb_quality.py            # 只报告，不因 warning 失败
+python scripts/misc/check_kb_quality.py --strict   # CI 用：warning 也升级为失败
 ```
 
 ## 维护纪律

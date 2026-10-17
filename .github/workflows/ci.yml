@@ -71,11 +71,12 @@ jobs:
         run: python scripts/misc/ai_finding.py validate
 
       # ai_finding validate 只校验字段形态；这一步回答的是「active 的 finding 有没有
-      # 一条本仓库拥有的证据、superseded 有没有指向真实技术条目」。判据用 git ls-files，
-      # 所以被 gitignore 的本地产物不会被当成证据。默认只出 warning（--strict 才升级为
-      # 失败），但 findings.jsonl 缺失/空解析/无 active 会直接红——空集不当通过。
+      # 一条可解析的证据、superseded 有没有指向真实技术条目」。判据分三类：本仓库
+      # 拥有 / 本地产物（projects、exports 等，合法证据位置）/ 断链，**不要求证据
+      # 搬进仓库**。findings.jsonl 缺失/空解析/无 active 会直接红——空集不当通过。
+      # 跑 --strict：warning 也升级为失败（当前数据 0 warning，升级是钉住现状）。
       - name: Findings quality check
-        run: python scripts/misc/check_kb_quality.py
+        run: python scripts/misc/check_kb_quality.py --strict
 
       - name: Upstream source manifest check
         run: python scripts/misc/check_upstream_sources.py

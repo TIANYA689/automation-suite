@@ -3,12 +3,18 @@
 
 回答两个问题（都只读、离线、零第三方依赖）：
 
-1. **active 的 finding 有没有证据，证据在不在本仓库里？**
-   `evidence.path` 必须点名一个**本仓库拥有**的文件。判据用 `git ls-files`，
-   不用工作区遍历——被 gitignore 的本地产物（`projects/`、`exports/`、
-   `reports/`、`tmp/`、`.workbuddy-ai/`）在本地存在、在干净克隆里不存在，
-   按工作区判会「本地绿、CI 红」（MEMORY 规则 113）。`git ls-files` 就是
-   「本仓库拥有」的可执行定义：它和 `actions/checkout` 看到的是同一份文件集。
+1. **active 的 finding 有没有证据，证据是不是一条断链？**
+   `evidence.path` 必须至少含一个**像路径**的 token（描述文字不算——schema 里
+   这个字段的语义是「证据文件相对路径」）。token 分三类：
+   - **本仓库拥有**（`git ls-files` 命中）→ 通过；
+   - **本地产物**（首段是 `projects/` `exports/` `reports/` `notes/` `tmp/`
+     `.workbuddy-ai/`）→ **通过**。库自己的 README 就用 `--evidence "exports/..."`
+     举例，这些目录是作业产物的既定位置，被 gitignore 是设计而非缺陷；
+   - **像仓库内路径却不在仓库里**（文件被删或路径写错）→ 断链，报
+     `evidence_broken`。
+   **不要求证据必须在仓库里**：本门禁的第一版用 `git ls-files` 一刀切，把上面
+   第二类判成缺陷，等于要求证据搬家——那是把判据的形态假设当成了事实（规则 98），
+   而且与库自己的 README 示例相矛盾。
 2. **superseded 的 finding 有没有指向真实存在的技术条目？**
    结论被更新时按 `kb/ai-findings/README.md` 的约定把 `status` 改成
    `superseded`，并在 `detail` 里指向新的 `kb/*/techniques/*.md`；那个引用
@@ -62,10 +68,25 @@ PATH_SUFFIXES = (
     ".java",
     ".ini",
     ".cfg",
+    ".har",
 )
-# 一个路径 token：以字母/数字/下划线开头，中间可含 `/ . - _` 与 CJK，
+
+# 「本地产物目录」——库自己的 README 用 `--evidence "exports/..."` 举例，这些
+# 目录是作业产物的既定位置（被 .gitignore 挡住是设计，不是缺陷）。证据落在这里
+# 一律通过：本门禁回答的是「有没有证据 / 是不是断链」，不是「证据搬没搬进仓库」。
+LOCAL_ARTIFACT_PREFIXES = (
+    "projects/",
+    "exports/",
+    "reports/",
+    "notes/",
+    "tmp/",
+    ".workbuddy-ai/",
+)
+# 一个路径 token：以字母/数字/下划线开头（**允许一个前导点**，否则
+# `.workbuddy-ai/…` 会被截成 `workbuddy-ai/…` 而前缀匹配不上——与 finding
+# 「check_doc_refs 的点目录归一化剥点」是同一个坑），中间可含 `/ . - _` 与 CJK，
 # 以「点 + 1~6 位后缀」结尾。`:行号` 与 `::符号` 因不含在字符集里而自然截断。
-PATH_TOKEN_RE = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_./\-\u4e00-\u9fff]*\.[A-Za-z0-9]{1,6}")
+PATH_TOKEN_RE = re.compile(r"\.?[A-Za-z0-9_][A-Za-z0-9_./\-\u4e00-\u9fff]*\.[A-Za-z0-9]{1,6}")
 SEGMENT_SPLIT_RE = re.compile(r"[;；]")
 
 
@@ -115,28 +136,37 @@ def _normalise(token: str) -> str:
 
 
 def resolve_token(token: str, tracked: set[str], basenames: set[str]) -> str:
-    """返回 token 的解析结果：`exact` / `basename` / `unowned`。
+    """返回 token 的解析结果：`exact` / `local` / `basename` / `bare` / `broken`。
 
-    裸文件名（无 `/`）允许按 basename 唯一匹配——与 `check_doc_refs` 的裸名判据
-    同形，只是这里按 `git ls-files` 而不是工作区。
+    - `exact`    ：本仓库拥有（`git ls-files` 命中）；
+    - `local`    ：落在本地产物目录下——**合法**的证据位置，只是不在仓库里；
+    - `basename` ：裸文件名，按 basename 命中仓库内文件；
+    - `bare`     ：裸文件名但仓库里没有——可能是本地产物的名字，不判断链；
+    - `broken`   ：像仓库内相对路径却解析不到——**断链**，这才要报。
     """
     normalised = _normalise(token)
     if normalised in tracked:
         return "exact"
-    if "/" not in normalised and normalised in basenames:
-        return "basename"
-    return "unowned"
+    if normalised.startswith(LOCAL_ARTIFACT_PREFIXES):
+        return "local"
+    if "/" not in normalised:
+        return "basename" if normalised in basenames else "bare"
+    return "broken"
 
 
 def _resolve_evidence(text: str, tracked: set[str], basenames: set[str]) -> tuple[str, list[str]]:
-    """返回 (结论, 未拥有的 token 列表)。结论 ∈ {resolved, unowned, none}。"""
+    """返回 (结论, 断链 token 列表)。结论 ∈ {resolved, broken, none}。
+
+    `none` 指整段里没有一个「像路径」的 token——schema 里 `path` 的语义是
+    证据文件相对路径，写成描述文字属字段误用，报 `missing_evidence`。
+    """
     tokens = extract_path_tokens(text)
     if not tokens:
         return "none", []
-    unowned = [t for t in tokens if resolve_token(t, tracked, basenames) == "unowned"]
-    if len(unowned) == len(tokens):
-        return "unowned", unowned
-    return "resolved", unowned
+    broken = [t for t in tokens if resolve_token(t, tracked, basenames) == "broken"]
+    if broken:
+        return "broken", broken
+    return "resolved", []
 
 
 def check(
@@ -163,25 +193,31 @@ def check(
             active += 1
             evidence = record.get("evidence")
             path_text = evidence.get("path", "") if isinstance(evidence, dict) else ""
-            verdict, unowned = _resolve_evidence(str(path_text), tracked, basenames)
-            if verdict == "none":
+            verdict, broken = _resolve_evidence(str(path_text), tracked, basenames)
+            confidence = str(record.get("confidence", "")).strip() or "<空>"
+            if verdict == "none" and confidence != "low":
                 warnings.append(
                     {
                         "line": record.get("_line"),
                         "title": record.get("title", ""),
                         "status": status,
                         "kind": "missing_evidence",
-                        "detail": "active 的 finding 没有可解析的 evidence 路径（README 约定：没有证据只能给 low 置信度）",
+                        "detail": (
+                            f"evidence.path 里没有一个像路径的 token（confidence={confidence}）——"
+                            "schema 里这个字段的语义是「证据文件相对路径」；"
+                            "README 约定：没有证据的发现只能给 low 置信度"
+                        ),
                     }
                 )
-            elif verdict == "unowned":
+            elif verdict == "broken":
                 warnings.append(
                     {
                         "line": record.get("_line"),
                         "title": record.get("title", ""),
                         "status": status,
-                        "kind": "evidence_not_owned",
-                        "detail": "evidence 路径不在本仓库拥有（gitignore 或已删除）：" + "、".join(unowned),
+                        "kind": "evidence_broken",
+                        "detail": "evidence 里像仓库内路径的 token 解析不到（文件已删或路径写错）："
+                        + "、".join(broken),
                     }
                 )
         elif status == "superseded":
@@ -194,7 +230,7 @@ def check(
                 for token in extract_path_tokens(haystack)
                 if "/techniques/" in _normalise(token)
                 and _normalise(token).endswith(".md")
-                and resolve_token(token, tracked, basenames) != "unowned"
+                and resolve_token(token, tracked, basenames) in ("exact", "basename")
             ]
             if not technique:
                 warnings.append(
