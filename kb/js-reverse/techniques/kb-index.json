@@ -10,7 +10,9 @@
         "selfdefending", "死代码", "代理函数", "字符串切片", "混淆类型", "美化"
       ],
       "files": ["01-obfuscation-signals.md"],
-      "priority": 10
+      "priority": 10,
+      "owner": "@wuyingzhishang",
+      "status": "active"
     },
     {
       "id": "crypto-fingerprints",
@@ -20,7 +22,9 @@
         "密文", "十六进制", "jwt"
       ],
       "files": ["02-crypto-fingerprints.md"],
-      "priority": 10
+      "priority": 10,
+      "owner": "@wuyingzhishang",
+      "status": "active"
     },
     {
       "id": "jsvmp-paths",
@@ -30,7 +34,9 @@
         "源码级插桩", "反追踪"
       ],
       "files": ["03-jsvmp-paths.md"],
-      "priority": 10
+      "priority": 10,
+      "owner": "@wuyingzhishang",
+      "status": "active"
     },
     {
       "id": "env-emulation-diff",
@@ -40,7 +46,9 @@
         "环境检测", "无头检测", "silent", "静默拒绝", "反检测"
       ],
       "files": ["04-env-emulation-diff.md"],
-      "priority": 9
+      "priority": 9,
+      "owner": "@wuyingzhishang",
+      "status": "active"
     },
     {
       "id": "transform-validation",
@@ -49,7 +57,9 @@
         "常量折叠", "词法绑定", "副作用", "求值顺序", "var提升", "分析副本"
       ],
       "files": ["05-transform-validation.md"],
-      "priority": 9
+      "priority": 9,
+      "owner": "@wuyingzhishang",
+      "status": "active"
     }
   ]
 }

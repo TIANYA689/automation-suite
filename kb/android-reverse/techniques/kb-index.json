@@ -11,7 +11,9 @@
         "验证器", "VerifyError", "move-result", "安装失败", "INSTALL_FAILED"
       ],
       "files": ["01-apk-and-dex-structure.md"],
-      "priority": 10
+      "priority": 10,
+      "owner": "@wuyingzhishang",
+      "status": "active"
     },
     {
       "id": "hardening-identification",
@@ -21,7 +23,9 @@
         "运行时识别", "壳族", "检测", "反调试", "停止点", "识别即止", "自测"
       ],
       "files": ["02-hardening-identification.md"],
-      "priority": 10
+      "priority": 10,
+      "owner": "@wuyingzhishang",
+      "status": "active"
     },
     {
       "id": "native-layer",
@@ -32,7 +36,9 @@
         "Dart", "AOT", "Flutter", "libapp", "寄存器", "字符串编码", "去混淆"
       ],
       "files": ["03-native-layer.md"],
-      "priority": 9
+      "priority": 9,
+      "owner": "@wuyingzhishang",
+      "status": "active"
     },
     {
       "id": "protocol-and-attribution",
@@ -43,7 +49,9 @@
         "差分", "opcode", "覆盖率", "闭环", "退避"
       ],
       "files": ["04-protocol-and-attribution.md"],
-      "priority": 9
+      "priority": 9,
+      "owner": "@wuyingzhishang",
+      "status": "active"
     },
     {
       "id": "dynamic-observation",
@@ -53,7 +61,9 @@
         "对拍", "工具版本对齐", "事件投递", "块数上限"
       ],
       "files": ["06-dynamic-observation.md"],
-      "priority": 9
+      "priority": 9,
+      "owner": "@wuyingzhishang",
+      "status": "active"
     },
     {
       "id": "failure-signatures-and-tooling",
@@ -63,7 +73,9 @@
         "往返损坏", "编码参数", "shell 展开", "安装成功但没装上", "裸数字码"
       ],
       "files": ["07-failure-signatures-and-tooling.md"],
-      "priority": 10
+      "priority": 10,
+      "owner": "@wuyingzhishang",
+      "status": "active"
     },
     {
       "id": "evidence-and-attribution-pitfalls",
@@ -73,7 +85,9 @@
         "服务端证书", "静态压运行时", "判据无效"
       ],
       "files": ["08-evidence-and-attribution-pitfalls.md"],
-      "priority": 9
+      "priority": 9,
+      "owner": "@wuyingzhishang",
+      "status": "active"
     },
     {
       "id": "analysis-hygiene",
@@ -82,7 +96,9 @@
         "侦察", "信息收集", "工具不可用", "数据一致性", "设备数据", "分析卫生"
       ],
       "files": ["05-analysis-hygiene.md"],
-      "priority": 8
+      "priority": 8,
+      "owner": "@wuyingzhishang",
+      "status": "active"
     }
   ]
 }

@@ -9,7 +9,9 @@
         "断点续做", "三态", "已排除", "死路", "不确定项", "已知限制", "沉淀", "反注水"
       ],
       "files": ["01-evidence-closure.md"],
-      "priority": 10
+      "priority": 10,
+      "owner": "@wuyingzhishang",
+      "status": "active"
     },
     {
       "id": "long-task-discipline",
@@ -20,7 +22,9 @@
         "约束轴", "交付形态", "免提权", "持久化", "分发自包含", "重新推导", "重走死路"
       ],
       "files": ["02-long-task-discipline.md"],
-      "priority": 10
+      "priority": 10,
+      "owner": "@wuyingzhishang",
+      "status": "active"
     },
     {
       "id": "verification-ladder",
@@ -30,7 +34,9 @@
         "报告模板", "残留", "反模式", "签名校验", "冷启动", "崩溃循环"
       ],
       "files": ["03-verification-ladder.md"],
-      "priority": 10
+      "priority": 10,
+      "owner": "@wuyingzhishang",
+      "status": "active"
     },
     {
       "id": "coverage-and-limits",
@@ -40,7 +46,9 @@
         "历史验证", "已验证", "推断", "已授权样本", "空白", "边界声明"
       ],
       "files": ["04-coverage-and-limits.md"],
-      "priority": 10
+      "priority": 10,
+      "owner": "@wuyingzhishang",
+      "status": "active"
     },
     {
       "id": "precedent-records",
@@ -49,7 +57,9 @@
         "回写", "复盘", "经验沉淀", "断言分级", "坑点目录", "一次收敛"
       ],
       "files": ["05-precedent-records.md"],
-      "priority": 9
+      "priority": 9,
+      "owner": "@wuyingzhishang",
+      "status": "active"
     },
     {
       "id": "symptom-index-and-capability-matrix",
@@ -59,7 +69,9 @@
         "豁免项", "工具被测量", "路线被测量"
       ],
       "files": ["06-symptom-index-and-capability-matrix.md"],
-      "priority": 9
+      "priority": 9,
+      "owner": "@wuyingzhishang",
+      "status": "active"
     },
     {
       "id": "external-source-audit",
@@ -68,7 +80,9 @@
         "知识库优化", "知识库审查", "知识漂移审查", "来源追溯", "上游吸收"
       ],
       "files": ["07-external-source-audit.md"],
-      "priority": 10
+      "priority": 10,
+      "owner": "@wuyingzhishang",
+      "status": "active"
     }
   ]
 }

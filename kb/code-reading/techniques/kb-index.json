@@ -10,7 +10,9 @@
         "可读性", "压缩脚本", "混淆识别", "静态库", "读不出", "没材料", "掩码"
       ],
       "files": ["01-teardown-workflow.md"],
-      "priority": 10
+      "priority": 10,
+      "owner": "@wuyingzhishang",
+      "status": "active"
     },
     {
       "id": "log-and-presentation",
@@ -19,7 +21,9 @@
         "表格对齐", "显示宽度", "控制台乱码", "结论先行", "分级标注", "长度预算"
       ],
       "files": ["02-log-and-presentation.md"],
-      "priority": 9
+      "priority": 9,
+      "owner": "@wuyingzhishang",
+      "status": "active"
     },
     {
       "id": "reuse-and-counter-implementation",
@@ -29,7 +33,9 @@
         "对照重写", "差异表", "知识回填", "哪些能进知识库", "可复用到知识库"
       ],
       "files": ["03-reuse-and-counter-implementation.md"],
-      "priority": 10
+      "priority": 10,
+      "owner": "@wuyingzhishang",
+      "status": "active"
     }
   ]
 }

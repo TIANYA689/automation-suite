@@ -10,7 +10,9 @@
         "payload 哈希"
       ],
       "files": ["01-static-first.md"],
-      "priority": 10
+      "priority": 10,
+      "owner": "@wuyingzhishang",
+      "status": "active"
     }
   ]
 }

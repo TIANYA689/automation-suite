@@ -10,7 +10,9 @@
         "环境变量说明", "可编辑配置", "语法检查", "保护版验证"
       ],
       "files": ["01-config-body-separation.md"],
-      "priority": 10
+      "priority": 10,
+      "owner": "@wuyingzhishang",
+      "status": "active"
     }
   ]
 }

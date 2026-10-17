@@ -9,7 +9,9 @@
         "成对调用", "导入表", "导出表", "反编译", "伪代码", "魔数", "函数识别", "命名"
       ],
       "files": ["01-symbol-recovery.md"],
-      "priority": 10
+      "priority": 10,
+      "owner": "@wuyingzhishang",
+      "status": "active"
     },
     {
       "id": "struct-recovery",
@@ -18,7 +20,9 @@
         "链表节点", "引用计数", "内存布局", "访问模式", "对象重建"
       ],
       "files": ["02-struct-recovery.md"],
-      "priority": 10
+      "priority": 10,
+      "owner": "@wuyingzhishang",
+      "status": "active"
     },
     {
       "id": "emulated-execution",
@@ -28,7 +32,9 @@
         "寄存器", "调用约定", "片段执行"
       ],
       "files": ["03-emulated-execution.md"],
-      "priority": 9
+      "priority": 9,
+      "owner": "@wuyingzhishang",
+      "status": "active"
     },
     {
       "id": "algorithm-identification",
@@ -37,7 +43,9 @@
         "kasiski", "ecb", "cbc", "分组模式", "差分", "变体实现", "查表"
       ],
       "files": ["04-algorithm-identification.md"],
-      "priority": 9
+      "priority": 9,
+      "owner": "@wuyingzhishang",
+      "status": "active"
     }
   ]
 }

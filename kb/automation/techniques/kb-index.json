@@ -10,7 +10,9 @@
         "路由结论", "索引一致性"
       ],
       "files": ["01-routing.md"],
-      "priority": 10
+      "priority": 10,
+      "owner": "@wuyingzhishang",
+      "status": "active"
     },
     {
       "id": "har-to-script",
@@ -36,7 +38,9 @@
         "接口面盘点", "掩码", "不透明串", "没材料与没命中"
       ],
       "files": ["02-har-to-script.md"],
-      "priority": 9
+      "priority": 9,
+      "owner": "@wuyingzhishang",
+      "status": "active"
     }
   ]
 }
